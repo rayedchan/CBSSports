@@ -1,0 +1,88 @@
+# Start MongoDB
+mongodb
+
+# Connect
+mongo
+
+# Create user for db
+use admin;
+db.createUser(
+  {
+    user: "admin",
+    pwd: "Password1",
+    roles: ["readWrite", "readWriteAnyDatabase", "dbAdminAnyDatabase", "clusterAdmin"]
+  }
+)
+
+db.createUser(
+  {
+    user: "myUserAdmin",
+    pwd: "abc123",
+    roles: [ { role: "userAdminAnyDatabase", db: "admin" } ]
+  }
+)
+
+
+db.createUser(
+  {
+    user: "admin",
+    pwd: "Password1",
+    roles: [ { role: "root", db: "admin" } ]
+  }
+);
+
+
+# Drop user
+db.dropUser("admin");
+
+# Start Mongo with authentication
+mongod --auth --dbpath /data/db
+
+# Connect to DB with user with auth db param
+mongo -u admin -p Password1
+mongo --port 27017 -u "admin" -p "Password1" --authenticationDatabase "admin"
+mongo mongodb://localhost/test?authSource=admin --username admin
+
+# Import sample data
+mongoimport --db test --collection inventory \
+       --authenticationDatabase admin --username <user> --password <password> \
+       --drop --file ~/Downloads/inventory.crud.json
+
+# Query collection
+myCursor = db.<collectionName>.find({});
+myCursor = db.inventory.find( { status: "D" } ) # With Filter
+myCursor = db.inventory.find( { size: { h: 14, w: 21, uom: "cm" } } ) # Filter embedded object: match all fields in embedded object
+myCursor = db.inventory.find( { "size.uom": "in" } ) # Filter specific field within embedded object
+
+
+
+
+
+# Iterate cursor
+while (myCursor.hasNext()) {
+    print(tojson(myCursor.next()));
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Create database
+use sports
+
+
+# Sample stuff
+use sports
+db.auth("admin", "Password1")
+db.foo.insert({x:1})
+db.foo.find({})
