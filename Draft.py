@@ -3,6 +3,14 @@ import json
 from MongoDB import Connect
 from pymongo import MongoClient
 from pprint import pprint
+from bson.son import SON
+from Player import Player
+
+# MongoDB connection
+connection = Connect.get_connection()
+
+# Access database
+db = connection.sports
 
 # curl -X GET 'http://api.cbssports.com/fantasy/sports?version=3.0&response_format=JSON'
 
@@ -41,7 +49,6 @@ players_data = players_req.json()['body']['players']
 
 print(players_req.json())
 
-'''
 for player in players_data:
     id = player['id']
     firstname = player['firstname']
@@ -55,23 +62,86 @@ for player in players_data:
     else:
         age = ""
 
+    '''
     print(id)
     print(firstname)
     print(lastname)
     print(position)
     print(age)
     print()
-'''
+    '''
 
-# MongoDB connection
-connection = Connect.get_connection()
+    obj = Player(id, firstname, lastname, position, age)
+    obj.displayPlayer()
 
-# Access database
-db = connection.test
+    dictionary = obj.__dict__
+    print(dictionary)
+    db.baseball.insert_one(
+       dictionary
+    )
+    break
+
 
 # Query collection with filter
-cursor = db.inventory.find({"status": "D"})
+cursor = db.inventory.find({})
 
+'''
 # iterate results
+for doc in cursor:
+     pprint(doc)
+
+'''
+
+'''
+# insert document into collection
+db.inventory.insert_one(
+    {
+        "item": "laptop",
+        "qty": 100,
+        "tags": ["machine", "code"],
+        "size": {"h": 22, "w": 10, "uom": "in"}
+    }
+)
+'''
+
+# Subdocument key order matters in a few of these examples so we have
+# to use bson.son.SON instead of a Python dict.
+'''
+db.inventory.insert_many([
+    {"item": "journal",
+     "qty": 25,
+     "size": SON([("h", 14), ("w", 21), ("uom", "cm")]),
+     "status": "A"},
+    {"item": "notebook",
+     "qty": 50,
+     "size": SON([("h", 8.5), ("w", 11), ("uom", "in")]),
+     "status": "A"}
+])
+'''
+
+
+
+'''
+cursor = db.inventory.find({"item": "journal"})
+cursor = db.inventory.find({"size.h" : 7})
 for inventory in cursor:
-     pprint(inventory)
+    pprint(inventory)
+'''
+
+'''
+db.inventory.update_one(
+    {"item": "paper"},
+    {"$set": {"size.uom": "cm", "status": "F"},
+     "$currentDate": {"lastModified": True}})
+
+db.inventory.update_many(
+    {"qty": {"$lt": 50}},
+    {"$set": {"size.uom": "in", "status": "P"},
+     "$currentDate": {"lastModified": True}})
+'''
+
+'''
+db.inventory.delete_one({"status": "D"})
+db.inventory.delete_many({"status": "A"})
+'''
+

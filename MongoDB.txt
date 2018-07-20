@@ -41,7 +41,7 @@ mongod --auth --dbpath /data/db
 # Connect to DB with user with auth db param
 mongo -u admin -p Password1
 mongo --port 27017 -u "admin" -p "Password1" --authenticationDatabase "admin"
-mongo mongodb://localhost/test?authSource=admin --username admin
+mongo mongodb://localhost:27017/test?authSource=admin --username admin
 
 # Import sample data
 mongoimport --db test --collection inventory \
@@ -54,19 +54,60 @@ myCursor = db.inventory.find( { status: "D" } ) # With Filter
 myCursor = db.inventory.find( { size: { h: 14, w: 21, uom: "cm" } } ) # Filter embedded object: match all fields in embedded object
 myCursor = db.inventory.find( { "size.uom": "in" } ) # Filter specific field within embedded object
 
-
-
-
-
 # Iterate cursor
 while (myCursor.hasNext()) {
     print(tojson(myCursor.next()));
 }
 
+# Insert document into collection
+db.inventory.insertOne(
+   { "item" : "canvas",
+     "qty" : 100,
+     "tags" : ["cotton"],
+     "size" : { "h" : 28, "w" : 35.5, "uom" : "cm" }
+   }
+);
 
 
+# Insert multiple documents
+db.inventory.insertMany([
+   { "item": "chair", "qty": 25, "size": { "h": 7, "w": 10, "uom": "in" }, "status": "A" },
+   { "item": "backpack", "qty": 50, "size": { "h": 80, "w": 60, "uom": "in" }, "status": "A" },
+]);
 
+# AND OR
+myCursor = db.inventory.find( {
+     status: "A",
+     $or: [ { qty: { $lt: 30 } }, { item: /^p/ } ]
+} )
 
+# Update single document
+db.inventory.updateOne(
+    { "item" : "paper" }, // specifies the document to update
+    {
+      $set: {  "size.uom" : "cm",  "status" : "P" },
+      $currentDate: { "lastModified": true }
+    }
+)
+
+# Update multiple documents
+db.inventory.updateMany(
+    { "qty" : { $lt: 50 } }, // specifies the documents to update
+    {
+       $set: { "size.uom" : "cm", "status": "P" },
+       $currentDate : { "lastModified": true }
+    }
+)
+
+# Delete single document
+db.inventory.deleteOne(
+    { "status": "D" } // specifies the document to delete
+)
+
+# Delete multiple documents
+db.inventory.deleteMany(
+    { "status" : "A" } // specifies the documents to delete
+)
 
 
 
