@@ -111,15 +111,24 @@ db.inventory.deleteMany(
 
 
 
-
-
-
-
-
-
-
 # Create database
 use sports
+
+# Display all collections
+show collections;
+db.getCollectionNames()
+
+# Drop collection
+db.<collectionName>.drop()
+
+# Create collection
+db.createCollection('<CollectionName>')
+
+
+
+
+
+
 
 
 # Sample stuff

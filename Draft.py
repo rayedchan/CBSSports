@@ -6,84 +6,109 @@ from pprint import pprint
 from bson.son import SON
 from Player import Player
 
+"""
+Get all type of sports from REST API call
+curl -X GET 'http://api.cbssports.com/fantasy/sports?version=3.0&response_format=JSON'
+"""
+def getAllSports():
+    # API end point to get all type of sports
+    url = "http://api.cbssports.com/fantasy/sports?version=3.0"
+
+    # Set response to return data in JSON format
+    params = {'response_format': 'JSON'}
+
+    # GET request call
+    req = requests.get(url, params)
+
+    # JSON data
+    data = req.json()
+
+    # Print
+    print(req.status_code)
+    print(req.json())
+
+    return data
+
+"""
+Create database collection for each type of sport
+"""
+def createSportsCollections(db, sportsJSON):
+    # Get the existing collections in database
+    existingCollections = db.list_collection_names()
+    print("Existing collections:", existingCollections)
+
+    # Iterate each type of sport
+    for sport in sportsJSON['body']['sports']:
+        print(sport)
+        id = sport['id']
+
+        # Create collection if it does not exist
+        if(id not in existingCollections):
+            db.create_collection(id)
+            print(id, 'collection created.')
+        else:
+            print(id, 'collection already exists in database.')
+
+"""
+Given a type of sport, insert player into proper sport collection
+curl "http://api.cbssports.com/fantasy/players/list?version=3.0&SPORT=baseball&response_format=JSON"
+"""
+def bulkInsertPlayers(db,sportId):
+    players_url="http://api.cbssports.com/fantasy/players/list?version=3.0"
+    players_params = {'response_format' : 'JSON', 'SPORT' : sportId}
+    players_req = requests.get(players_url, players_params)
+    players_data = players_req.json()['body']['players']
+    print(players_req.json())
+
+    for player in players_data:
+        id = player['id']
+        firstname = player['firstname']
+        lastname = player['lastname']
+        position = player['position']
+        age = ""
+
+        # Check if field key exists
+        if 'age' in player:
+            age = player['age']
+        else:
+            age = ""
+
+        obj = Player(id, firstname, lastname, position, age)
+        obj.displayPlayer()
+
+        dictionary = obj.__dict__
+        print(dictionary)
+
+        # TODO: Adjust for bulk insert to reduce number of db calls
+        # TODO: Make method re-callable without inserting same data
+        db[sportId].insert_one(dictionary)
+
+
 # MongoDB connection
 connection = Connect.get_connection()
 
 # Access database
 db = connection.sports
 
-# curl -X GET 'http://api.cbssports.com/fantasy/sports?version=3.0&response_format=JSON'
+# Sports JSON data
+sportsJSON = getAllSports()
 
-# API end point
-url = "http://api.cbssports.com/fantasy/sports?version=3.0"
+# Create collections
+createSportsCollections(db, sportsJSON)
 
-# Set response to return data in JSON format
-params = {'response_format': 'JSON'}
-
-# GET request call
-req = requests.get(url, params)
-
-# JSON data
-data = req.json()
-
-# Print
-print(req.status_code)
-print(req.json())
-print()
-
-# TODO: Find better way to handle json data
-for sport in data['body']['sports']:
+for sport in sportsJSON['body']['sports']:
     print(sport)
-    sport_name = sport['name']
-    pro_label = sport['pro_abbrev']
-    id = sport['id']
-
-
-
-# curl "http://api.cbssports.com/fantasy/players/list?version=3.0&SPORT=baseball&response_format=JSON"
-players_url="http://api.cbssports.com/fantasy/players/list?version=3.0"
-sport = 'baseball'
-players_params = {'response_format' : 'JSON', 'SPORT' : sport}
-players_req = requests.get(players_url, players_params)
-players_data = players_req.json()['body']['players']
-
-print(players_req.json())
-
-for player in players_data:
-    id = player['id']
-    firstname = player['firstname']
-    lastname = player['lastname']
-    position = player['position']
-    age = ""
-
-    # Check if field key exists
-    if 'age' in player:
-        age = player['age']
-    else:
-        age = ""
-
-    '''
-    print(id)
-    print(firstname)
-    print(lastname)
-    print(position)
-    print(age)
-    print()
-    '''
-
-    obj = Player(id, firstname, lastname, position, age)
-    obj.displayPlayer()
-
-    dictionary = obj.__dict__
-    print(dictionary)
-    db.baseball.insert_one(
-       dictionary
-    )
+    sportId = sport['id']
+    bulkInsertPlayers(db, sportId)
     break
 
 
+
+'''
 # Query collection with filter
 cursor = db.inventory.find({})
+'''
+
 
 '''
 # iterate results
