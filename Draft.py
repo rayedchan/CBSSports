@@ -80,9 +80,49 @@ def bulkInsertPlayers(db,sportId):
         print(dictionary)
 
         # TODO: Adjust for bulk insert to reduce number of db calls
-        # TODO: Make method re-callable without inserting same data
-        db[sportId].insert_one(dictionary)
 
+        # Inserts dictionary object into collection with generated _id and no unique field identified
+        #db[sportId].upinsert_one(dictionary)
+
+        # Updates the document if it exists else insert new document
+        # Search filter uses id to find existing document
+        db[sportId].update_one({"id" : id}, {"$set": dictionary}, upsert=True)
+
+
+'''
+Calculate the average age for each position
+via MongoDB aggregate function 
+'''
+def getAllAvgPositionAge(db, collectionName):
+    mapResult = {}
+    aggre_string = [{"$group": {"_id" :"$position", "avg_age": {"$avg": "$age"}}}]
+    positions = db[collectionName].aggregate(aggre_string)
+    for position in positions:
+        #pprint(position)
+        mapResult[position['_id']] = position['avg_age']
+
+    #print(mapResult)
+    return mapResult
+
+'''
+Calculates name brief given first name, last name, and the type of sport
+'''
+def deriveNameBrief(firstName, lastName, sportType):
+    name_brief = ''
+
+    # For baseball players it should be just first initial and last initial like G. S.
+    if sportType == 'baseball':
+        name_brief = firstName[0] + '. ' + lastName[0] + '.'
+
+    # For basketball players it should be first name plus last initial like Kevin D.
+    elif sportType == 'basketball':
+        name_brief = firstName + ' ' + lastName[0] + '.'
+
+    # For football players it should be first initial and their last name like M. Stafford
+    elif sportType == 'football':
+        name_brief = firstName[0] + '. ' + lastName
+
+    return name_brief
 
 # MongoDB connection
 connection = Connect.get_connection()
@@ -90,6 +130,7 @@ connection = Connect.get_connection()
 # Access database
 db = connection.sports
 
+'''
 # Sports JSON data
 sportsJSON = getAllSports()
 
@@ -102,7 +143,16 @@ for sport in sportsJSON['body']['sports']:
     bulkInsertPlayers(db, sportId)
     break
 
+results = getAllAvgPositionAge(db, "baseball")
+print(results)
+'''
 
+x = deriveNameBrief('Derek', 'Jeter', 'baseball')
+print(x)
+x = deriveNameBrief('Kevin', 'Durant', 'basketball')
+print(x)
+x = deriveNameBrief('Matt', 'Stafford', 'football')
+print(x)
 
 '''
 # Query collection with filter
