@@ -1,5 +1,6 @@
 import requests
 import json
+import math
 from MongoDB import Connect
 from pymongo import MongoClient
 from pprint import pprint
@@ -105,7 +106,18 @@ def getAllAvgPositionAge(db, collectionName):
     return mapResult
 
 '''
-Calculates name brief given first name, last name, and the type of sport
+Calculate the average age for a specific position via MongoDB aggregate function 
+The remainder is truncated
+'''
+def getAvgPositionAge(db, collectionName, position):
+    # Query to match against a specific position and calculate age average
+    aggre_string = [{"$match": {"position": position} },{"$group": {"_id" :"$position", "avg_age": {"$avg": "$age"}}}]
+    cursor = db[collectionName].aggregate(aggre_string)
+    avg_age = cursor.next()['avg_age']
+    return math.floor(avg_age)
+
+'''
+Calculates name brief of a player given first name, last name, and the type of sport
 '''
 def deriveNameBrief(firstName, lastName, sportType):
     name_brief = ''
@@ -123,6 +135,26 @@ def deriveNameBrief(firstName, lastName, sportType):
         name_brief = firstName[0] + '. ' + lastName
 
     return name_brief
+
+'''
+Get a single player JSON object
+'''
+def getPlayer(db, sportType, playerId):
+    # Query using player id as a filter
+    # Also exclude the generated MongoDB _id field from result
+    cursor = db[sportType].find({"id" : playerId},  {"_id": 0})
+
+    # for player in cursor:
+    #    pprint(player)
+
+    # Get first document in cursor
+    player = cursor.next()
+
+    # Add the calculated fields to JSON object
+    player["name_brief"] = deriveNameBrief(player['first_name'], player['last_name'], sportType)
+    player["average_position_age_diff"] = getAvgPositionAge(db, sportType, player['position']) - player['age']
+    print(player)
+
 
 # MongoDB connection
 connection = Connect.get_connection()
@@ -145,14 +177,22 @@ for sport in sportsJSON['body']['sports']:
 
 results = getAllAvgPositionAge(db, "baseball")
 print(results)
+
+x = getAvgPositionAge(db, "baseball", "LF")
+print(x)
 '''
 
+'''
 x = deriveNameBrief('Derek', 'Jeter', 'baseball')
 print(x)
 x = deriveNameBrief('Kevin', 'Durant', 'basketball')
 print(x)
 x = deriveNameBrief('Matt', 'Stafford', 'football')
 print(x)
+'''
+
+getPlayer(db, "baseball", "2226042")
+
 
 '''
 # Query collection with filter
