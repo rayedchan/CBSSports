@@ -6,6 +6,8 @@ from pymongo import MongoClient
 from pprint import pprint
 from bson.son import SON
 from Player import Player
+from flask import Flask
+from flask_restful import Api, Resource, reqparse
 
 """
 Get all type of sports from REST API call
@@ -81,7 +83,6 @@ def bulkInsertPlayers(db,sportId):
         print(dictionary)
 
         # TODO: Adjust for bulk insert to reduce number of db calls
-
         # Inserts dictionary object into collection with generated _id and no unique field identified
         #db[sportId].upinsert_one(dictionary)
 
@@ -140,6 +141,8 @@ def deriveNameBrief(firstName, lastName, sportType):
 Get a single player JSON object
 '''
 def getPlayer(db, sportType, playerId):
+    player = None
+
     # Query using player id as a filter
     # Also exclude the generated MongoDB _id field from result
     cursor = db[sportType].find({"id" : playerId},  {"_id": 0})
@@ -147,20 +150,63 @@ def getPlayer(db, sportType, playerId):
     # for player in cursor:
     #    pprint(player)
 
-    # Get first document in cursor
-    player = cursor.next()
+    # Get number of documents from query
+    num = cursor.count()
+    print(num)
 
-    # Add the calculated fields to JSON object
-    player["name_brief"] = deriveNameBrief(player['first_name'], player['last_name'], sportType)
-    player["average_position_age_diff"] = getAvgPositionAge(db, sportType, player['position']) - player['age']
-    print(player)
+    # There exist 1 document from query
+    if num != 0:
+        # Get first document in cursor
+        player = cursor.next()
 
+        # Add the calculated fields to JSON object
+        player["name_brief"] = deriveNameBrief(player['first_name'], player['last_name'], sportType)
+        #TODO: Update code to get player average
+        player["average_position_age_diff"] = getAvgPositionAge(db, sportType, player['position']) - player['age']
+        print(player)
+
+    return player
+
+
+# Current Average = CA
+# Current Total Players = CTP
+# New Player Age = NPA
+# Player Age = PA
+# Old Player Age = OPA
+# New Player Age = NPA
+
+# New AVG on insert of new player = ((CA * CTP) + NPA) / (CTP + 1)
+# New AVG on deletion of player = ((CA * CTP)  - PA / (CTP - 1)
+# New AVG on update of player age = (CA * CTP) - OPA + NA / CTP
 
 # MongoDB connection
 connection = Connect.get_connection()
 
 # Access database
 db = connection.sports
+
+# Use Flask Framework to create REST endpoint
+app = Flask(__name__)
+api = Api(app)
+
+class SportPlayer(Resource):
+    # Get a single sport player
+    # curl http://127.0.0.1:5000/user/baseball/2165933
+    def get(self, sportType, playerId):
+        player = getPlayer(db, sportType, playerId)
+
+        if player is None:
+            return "User not found", 404
+
+        return player, 200
+
+
+# Define URI endpoints
+api.add_resource(SportPlayer, "/user/<string:sportType>/<string:playerId>")
+
+# Debug mode, enables reload automatically
+app.run(debug =True)
+
 
 '''
 # Sports JSON data
@@ -191,13 +237,17 @@ x = deriveNameBrief('Matt', 'Stafford', 'football')
 print(x)
 '''
 
+'''
 getPlayer(db, "baseball", "2226042")
-
+'''
 
 '''
 # Query collection with filter
 cursor = db.inventory.find({})
 '''
+
+#results = getAllAvgPositionAge(db, "baseball")
+#print(results)
 
 
 '''
