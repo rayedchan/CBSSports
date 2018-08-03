@@ -123,22 +123,38 @@ Calculates name brief of a player given first name, last name, and the type of s
 def deriveNameBrief(firstName, lastName, sportType):
     name_brief = ''
 
+    # Return empty string if either first or last names is empty
+    if not firstName or not lastName:
+        return ''
+
     # For baseball players it should be just first initial and last initial like G. S.
     if sportType == 'baseball':
-        name_brief = firstName[0] + '. ' + lastName[0] + '.'
+        # ternary operator <firstVal> if <condition> else <useSecondVal>
+        # empty string is falsy
+        name_brief = firstName[0] if firstName else '' + '. ' + lastName[0] + '.'
 
     # For basketball players it should be first name plus last initial like Kevin D.
     elif sportType == 'basketball':
-        name_brief = firstName + ' ' + lastName[0] + '.'
+        name_brief = firstName + ' ' + lastName[0] if lastName else '' + '.'
 
     # For football players it should be first initial and their last name like M. Stafford
     elif sportType == 'football':
-        name_brief = firstName[0] + '. ' + lastName
+        name_brief = firstName[0] if firstName else '' + '. ' + lastName
 
     return name_brief
 
 '''
-Get a single player JSON object
+Get a single player JSON object with the 
+following fields returned:
+{
+    id:
+    name_brief:
+    first_name:
+    last_name:
+    position:
+    age:
+    average_position_age_diff:
+}
 '''
 def getPlayer(db, sportType, playerId):
     player = None
@@ -146,9 +162,6 @@ def getPlayer(db, sportType, playerId):
     # Query using player id as a filter
     # Also exclude the generated MongoDB _id field from result
     cursor = db[sportType].find({"id" : playerId},  {"_id": 0})
-
-    # for player in cursor:
-    #    pprint(player)
 
     # Get number of documents from query
     num = cursor.count()
@@ -166,6 +179,30 @@ def getPlayer(db, sportType, playerId):
         print(player)
 
     return player
+
+'''
+Get all the players in a given sport
+'''
+def getAllPlayers(db, sportName):
+    playerList = []
+
+    # Query all documents in a given sport collection
+    # excluding the generated id
+    cursor = db[sportName].find({}, {"_id": 0})
+
+    # Add each player with calculated fields to list
+    for player in cursor:
+        # Calculate custom fields
+        player["name_brief"] = deriveNameBrief(player['first_name'], player['last_name'], sportName)
+
+        # Check if player age exists
+        if player['age']:
+            player["average_position_age_diff"] = getAvgPositionAge(db, sportName, player['position']) - player['age']
+
+        # Insert to front of list
+        playerList.insert(0, player)
+
+    return playerList
 
 
 # Current Average = CA
@@ -200,13 +237,16 @@ class SportPlayer(Resource):
 
         return player, 200
 
-
 # Define URI endpoints
 api.add_resource(SportPlayer, "/user/<string:sportType>/<string:playerId>")
 
+@app.route('/sports/<sportName>')
+def getAllSportPlayers(sportName):
+    playerList = getAllPlayers(db, sportName)
+    return json.dumps({'results': playerList}), 200
+
 # Debug mode, enables reload automatically
 app.run(debug =True)
-
 
 '''
 # Sports JSON data
