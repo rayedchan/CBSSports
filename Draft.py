@@ -9,6 +9,8 @@ from Player import Player
 from flask import Flask
 from flask_restful import Api, Resource, reqparse
 
+postAvgAgeCollectionName = 'positionAvgAge'
+
 """
 Get all type of sports from REST API call
 curl -X GET 'http://api.cbssports.com/fantasy/sports?version=3.0&response_format=JSON'
@@ -27,13 +29,14 @@ def getAllSports():
     data = req.json()
 
     # Print
-    print(req.status_code)
-    print(req.json())
+    #print(req.status_code)
+    #print(req.json())
 
     return data
 
 """
 Create database collection for each type of sport
+Also, create collection to store average age for every position
 """
 def createSportsCollections(db, sportsJSON):
     # Get the existing collections in database
@@ -46,11 +49,18 @@ def createSportsCollections(db, sportsJSON):
         id = sport['id']
 
         # Create collection if it does not exist
-        if(id not in existingCollections):
+        if id not in existingCollections:
             db.create_collection(id)
             print(id, 'collection created.')
         else:
             print(id, 'collection already exists in database.')
+
+    # Create a separate collection for storing position average age
+    if postAvgAgeCollectionName not in existingCollections:
+        db.create_collection(postAvgAgeCollectionName)
+        print(postAvgAgeCollectionName, 'collection created.')
+    else:
+        print(postAvgAgeCollectionName, 'collection already exists in database.')
 
 """
 Given a type of sport, insert player into proper sport collection
@@ -61,7 +71,7 @@ def bulkInsertPlayers(db,sportId):
     players_params = {'response_format' : 'JSON', 'SPORT' : sportId}
     players_req = requests.get(players_url, players_params)
     players_data = players_req.json()['body']['players']
-    print(players_req.json())
+    #print(players_req.json())
 
     for player in players_data:
         id = player['id']
@@ -77,10 +87,10 @@ def bulkInsertPlayers(db,sportId):
             age = ""
 
         obj = Player(id, firstname, lastname, position, age)
-        obj.displayPlayer()
+        #obj.displayPlayer()
 
         dictionary = obj.__dict__
-        print(dictionary)
+        #print(dictionary)
 
         # TODO: Adjust for bulk insert to reduce number of db calls
         # Inserts dictionary object into collection with generated _id and no unique field identified
@@ -92,30 +102,67 @@ def bulkInsertPlayers(db,sportId):
 
 
 '''
-Calculate the average age for each position
+Calculate the average age for each position for a specific sport
 via MongoDB aggregate function 
 '''
 def getAllAvgPositionAge(db, collectionName):
-    mapResult = {}
+    result = []
     aggre_string = [{"$group": {"_id" :"$position", "avg_age": {"$avg": "$age"}}}]
     positions = db[collectionName].aggregate(aggre_string)
     for position in positions:
         #pprint(position)
-        mapResult[position['_id']] = position['avg_age']
+        obj={}
+        obj['sport_type'] = collectionName
+        obj['position'] = position['_id']
+        obj['avg_age'] = position['avg_age']
+        result.append(obj)
 
-    #print(mapResult)
-    return mapResult
+    return result
+'''
+Setup the average ave position collection which stores average age per position
+for all sports
+'''
+def setupAvgPositionCollection(db, sportsJSON):
+    # Clear out average collection
+    db[postAvgAgeCollectionName].delete_many({})
+
+    # Bulk insert average age positions per sport
+    for sport in sportsJSON['body']['sports']:
+        sportType = sport['id']
+        result = getAllAvgPositionAge(db, sportType)
+        db[postAvgAgeCollectionName].insert_many(result)
 
 '''
-Calculate the average age for a specific position via MongoDB aggregate function 
-The remainder is truncated
+Setup the backend layer
+1. Setup the sport collections with sport players documents added
+2. Setup a average collection containing average avg per position for all sports
+'''
+def initializeBackend(db):
+    # Sports JSON data
+    sportsJSON = getAllSports()
+
+    # Create collections
+    createSportsCollections(db, sportsJSON)
+
+    for sport in sportsJSON['body']['sports']:
+        #print(sport)
+        sportId = sport['id']
+        bulkInsertPlayers(db, sportId)
+
+    # Sports JSON data
+    sportsJSON = getAllSports()
+    setupAvgPositionCollection(db, sportsJSON)
+
+'''
+Get the average age for a specific position from average avg collection
 '''
 def getAvgPositionAge(db, collectionName, position):
     # Query to match against a specific position and calculate age average
-    aggre_string = [{"$match": {"position": position} },{"$group": {"_id" :"$position", "avg_age": {"$avg": "$age"}}}]
-    cursor = db[collectionName].aggregate(aggre_string)
+    # aggre_string = [{"$match": {"position": position} },{"$group": {"_id" :"$position", "avg_age": {"$avg": "$age"}}}]
+    # cursor = db[collectionName].aggregate(aggre_string)
+    cursor = db[postAvgAgeCollectionName].find({"sport_type": collectionName, "position": position})
     avg_age = cursor.next()['avg_age']
-    return math.floor(avg_age)
+    return avg_age
 
 '''
 Calculates name brief of a player given first name, last name, and the type of sport
@@ -222,6 +269,8 @@ connection = Connect.get_connection()
 # Access database
 db = connection.sports
 
+#initializeBackend(db)
+
 # Use Flask Framework to create REST endpoint
 app = Flask(__name__)
 api = Api(app)
@@ -248,25 +297,12 @@ def getAllSportPlayers(sportName):
 # Debug mode, enables reload automatically
 app.run(debug =True)
 
-'''
-# Sports JSON data
-sportsJSON = getAllSports()
 
-# Create collections
-createSportsCollections(db, sportsJSON)
+#results = getAllAvgPositionAge(db, "baseball")
+#print(results)
 
-for sport in sportsJSON['body']['sports']:
-    print(sport)
-    sportId = sport['id']
-    bulkInsertPlayers(db, sportId)
-    break
-
-results = getAllAvgPositionAge(db, "baseball")
-print(results)
-
-x = getAvgPositionAge(db, "baseball", "LF")
-print(x)
-'''
+#x = getAvgPositionAge(db, "baseball", "LF")
+#print(x)
 
 '''
 x = deriveNameBrief('Derek', 'Jeter', 'baseball')
