@@ -6,7 +6,7 @@ from pymongo import MongoClient
 from pprint import pprint
 from bson.son import SON
 from Player import Player
-from flask import Flask
+from flask import Flask, jsonify, make_response, abort, request
 from flask_restful import Api, Resource, reqparse
 
 postAvgAgeCollectionName = 'positionAvgAge'
@@ -178,15 +178,15 @@ def deriveNameBrief(firstName, lastName, sportType):
     if sportType == 'baseball':
         # ternary operator <firstVal> if <condition> else <useSecondVal>
         # empty string is falsy
-        name_brief = firstName[0] if firstName else '' + '. ' + lastName[0] + '.'
+        name_brief = (firstName[0] if firstName else '') + '. ' + lastName[0] + '.'
 
     # For basketball players it should be first name plus last initial like Kevin D.
     elif sportType == 'basketball':
-        name_brief = firstName + ' ' + lastName[0] if lastName else '' + '.'
+        name_brief = (firstName + ' ' + lastName[0] if lastName else '') + '.'
 
     # For football players it should be first initial and their last name like M. Stafford
     elif sportType == 'football':
-        name_brief = firstName[0] if firstName else '' + '. ' + lastName
+        name_brief = (firstName[0] if firstName else '') + '. ' + lastName
 
     return name_brief
 
@@ -222,7 +222,11 @@ def getPlayer(db, sportType, playerId):
         # Add the calculated fields to JSON object
         player["name_brief"] = deriveNameBrief(player['first_name'], player['last_name'], sportType)
         #TODO: Update code to get player average
-        player["average_position_age_diff"] = getAvgPositionAge(db, sportType, player['position']) - player['age']
+
+        # Check if player age exists
+        if player['age']:
+            player["average_position_age_diff"] = getAvgPositionAge(db, sportType, player['position']) - player['age']
+
         print(player)
 
     return player
@@ -277,22 +281,79 @@ api = Api(app)
 
 class SportPlayer(Resource):
     # Get a single sport player
-    # curl http://127.0.0.1:5000/user/baseball/2165933
+    # curl http://127.0.0.1:5000/baseball/player/2165933
     def get(self, sportType, playerId):
         player = getPlayer(db, sportType, playerId)
 
         if player is None:
-            return "User not found", 404
+            abort(404) # 404 Resource Not Found
 
-        return player, 200
+        return jsonify({"player": player}), 200
 
 # Define URI endpoints
-api.add_resource(SportPlayer, "/user/<string:sportType>/<string:playerId>")
+api.add_resource(SportPlayer, "/<string:sportType>/player/<string:playerId>")
 
-@app.route('/sports/<sportName>')
+@app.route('/sports/<string:sportName>/players', methods=['GET'])
 def getAllSportPlayers(sportName):
     playerList = getAllPlayers(db, sportName)
-    return json.dumps({'results': playerList}), 200
+    # return formatted JSON
+    return jsonify({'players': playerList}), 200
+    # return compressed json
+    #return json.dumps({'results': playerList}), 200
+
+# Get all types of sports
+@app.route('/sports', methods=['GET'])
+def getAllSportTypes():
+     # Get all collections within a database
+     sportList = db.list_collection_names()
+
+     # Remove average collection from list
+     sportList.remove(postAvgAgeCollectionName)
+     #pprint(sportList)
+
+     return jsonify({"sports": sportList}), 200
+
+# Get a specific sport
+@app.route('/sports/<string:sportType>', methods=['GET'])
+def getSportType(sportType):
+    # Get all collections within a database
+    sportList = db.list_collection_names()
+
+    for sportName in sportList:
+        if sportName == sportType:
+            return jsonify({'sport': sportName}), 200
+
+    abort(404)
+
+# Create a new sport collection
+# curl -i -H "Content-Type: application/json" -X POST -d '{"sport_type":"soccer"}' http://localhost:5000/sports
+@app.route('/sports', methods=['POST'])
+def createSport():
+    if not request.json or not 'sport_type' in request.json:
+        abort(400) # 400 Bad request
+    db.create_collection(request.json['sport_type'])
+    return jsonify({'sport': request.json['sport_type']}), 201 # 201 Created
+
+# Delete a sport
+# curl -i -H "Content-Type: application/json" -X DELETE http://localhost:5000/sports/soccer
+@app.route('/sports/<string:sportType>', methods=['DELETE'])
+def deleteSport(sportType):
+    # Get all collections within a database
+    sportList = db.list_collection_names()
+
+    # Find the sport and remove
+    for sportName in sportList:
+        if sportName == sportType:
+            db.drop_collection(sportType)
+            return jsonify({'result': True})
+
+    abort(404)
+
+
+# Response error for 404 in JSON
+@app.errorhandler(404)
+def not_found(error):
+    return make_response(jsonify({'error': 'Not found'}), 404)
 
 # Debug mode, enables reload automatically
 app.run(debug =True)
