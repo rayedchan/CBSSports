@@ -8,6 +8,7 @@ from bson.son import SON
 from Player import Player
 from flask import Flask, jsonify, make_response, abort, request
 from flask_restful import Api, Resource, reqparse
+from bson.json_util import dumps
 
 postAvgAgeCollectionName = 'positionAvgAge'
 
@@ -286,9 +287,62 @@ class SportPlayer(Resource):
         player = getPlayer(db, sportType, playerId)
 
         if player is None:
-            abort(404) # 404 Resource Not Found
+            abort(404)  # 404 Resource Not Found
 
         return jsonify({"player": player}), 200
+
+    # Create a new player
+    # curl -i -H "Content-Type: application/json" -X POST -d '{"age": 35, "first_name":"Satoshi", "last_name":"Ketchum", "position":"C"}' http://localhost:5000/baseball/player/5000001
+    def post(self,sportType, playerId):
+        # Check if the player id exists in the backend
+        player = getPlayer(db, sportType, playerId)
+
+        # Create new player if id does not exist
+        if player is None:
+            newPlayer ={
+                'id' : playerId,
+                'age' : request.json['age'],
+                'first_name': request.json['first_name'],
+                'last_name': request.json['last_name'],
+                'position': request.json['position']
+            }
+            db[sportType].insert_one(newPlayer)
+            del newPlayer['_id']  # Remove MongoDB generated Object Id
+            return jsonify({"player": newPlayer})  # 201 Created
+            #return dumps(newPlayer), 200
+        else:
+            return make_response(jsonify({'error': 'User already exists'}), 400)  # Bad Request
+
+    # Delete a player
+    # curl -i -H "Content-Type: application/json" -X DELETE http://localhost:5000/baseball/player/5000001
+    def delete(self, sportType, playerId):
+        # Check if the player id exists in the backend
+        player = getPlayer(db, sportType, playerId)
+
+        if player is None:
+            return make_response(jsonify({'error': 'User does not exist'}), 404)  # Not Found
+        else:
+            db[sportType].delete_one({'id': playerId})  # delete document from db
+            return {}, 204  # No content
+
+    # Update a player
+    # curl -i -H "Content-Type: application/json" -X PUT -d '{"age": 35, "first_name":"Satoshi", "last_name":"Reddo", "position":"CF"}' http://localhost:5000/baseball/player/5000001
+    def put(self, sportType, playerId):
+        # Check if the player id exists in the backend
+        player = getPlayer(db, sportType, playerId)
+
+        if player is None:
+            return make_response(jsonify({'error': 'User does not exist'}), 404)  # Not Found
+        else:
+            updatePlayer ={
+                'age' : request.json['age'],
+                'first_name': request.json['first_name'],
+                'last_name': request.json['last_name'],
+                'position': request.json['position']
+            }
+            db[sportType].update_one({"id": playerId}, {"$set": updatePlayer}, upsert=False)  # update document from db
+            return {}, 200  # No content
+
 
 # Define URI endpoints
 api.add_resource(SportPlayer, "/<string:sportType>/player/<string:playerId>")
