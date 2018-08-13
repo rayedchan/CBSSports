@@ -9,6 +9,7 @@ from Player import Player
 from flask import Flask, jsonify, make_response, abort, request
 from flask_restful import Api, Resource, reqparse
 from bson.json_util import dumps
+from mongotriggers import MongoTrigger
 
 postAvgAgeCollectionName = 'positionAvgAge'
 
@@ -189,6 +190,10 @@ def deriveNameBrief(firstName, lastName, sportType):
     elif sportType == 'football':
         name_brief = (firstName[0] if firstName else '') + '. ' + lastName
 
+    # All other sports
+    else:
+        name_brief = firstName + ' ' + lastName
+
     return name_brief
 
 '''
@@ -256,7 +261,6 @@ def getAllPlayers(db, sportName):
 
     return playerList
 
-
 # Current Average = CA
 # Current Total Players = CTP
 # New Player Age = NPA
@@ -267,6 +271,83 @@ def getAllPlayers(db, sportName):
 # New AVG on insert of new player = ((CA * CTP) + NPA) / (CTP + 1)
 # New AVG on deletion of player = ((CA * CTP)  - PA / (CTP - 1)
 # New AVG on update of player age = (CA * CTP) - OPA + NA / CTP
+def updateAgeAvgOnInsert(db, sportType, newPlayer):
+    position = newPlayer['position']
+    print(position)
+
+    # Get total number of documents for specific position with valid age
+    currentTotalPlayer = db[sportType].count_documents({"position": position, "age": {"$gt": 0}})
+    print('Total players ', currentTotalPlayer)
+
+    # Get current average for position
+    avgCursor = db[postAvgAgeCollectionName].find({"sport_type": sportType, "position": position})
+    currentAverage = 0
+    # Iterate results
+    for doc in avgCursor:
+        pprint(doc)
+        currentAverage = doc['avg_age']
+
+    newPlayerAge = newPlayer['age']
+    if newPlayerAge > 0:
+        newPositionAvg = ((currentAverage * currentTotalPlayer) + newPlayerAge) / (currentTotalPlayer + 1)
+        print('New position age average: ', newPositionAvg)
+        db[postAvgAgeCollectionName].update_one({"sport_type": sportType, "position": position}, {"$set": {"avg_age": newPositionAvg}}, upsert=True)
+    else:
+        print('No updates to position age average')
+
+def updateAgeAvgOnDelete(db, sportType, rmPlayer):
+    position = rmPlayer['position']
+    print(position)
+
+    # Get total number of documents for specific position with valid age
+    currentTotalPlayer = db[sportType].count_documents({"position": position, "age": {"$gt": 0}})
+    print('Total players ', currentTotalPlayer)
+
+    # Get current average for position
+    avgCursor = db[postAvgAgeCollectionName].find({"sport_type": sportType, "position": position})
+    currentAverage = 0
+    # Iterate results
+    for doc in avgCursor:
+        pprint(doc)
+        currentAverage = doc['avg_age']
+
+    rmPlayerAge = rmPlayer['age']
+    if rmPlayerAge > 0:
+        newTotalPlayer = currentTotalPlayer - 1
+        newPositionAvg = 0
+        if newTotalPlayer != 0:
+            newPositionAvg = ((currentAverage * currentTotalPlayer) - rmPlayerAge) / (currentTotalPlayer - 1)
+        print('New position age average: ', newPositionAvg)
+        db[postAvgAgeCollectionName].update_one({"sport_type": sportType, "position": position}, {"$set": {"avg_age": newPositionAvg}}, upsert=True)
+    else:
+        print('No updates to position age average')
+
+def updateAgeAvgOnUpdate(db, sportType, oldPlayerState, newPlayerState):
+    position = oldPlayerState['position']
+    print(position)
+
+    # Get total number of documents for specific position with valid age
+    currentTotalPlayer = db[sportType].count_documents({"position": position, "age": {"$gt": 0}})
+    print('Total players ', currentTotalPlayer)
+
+    # Get current average for position
+    avgCursor = db[postAvgAgeCollectionName].find({"sport_type": sportType, "position": position})
+    currentAverage = 0
+    # Iterate results
+    for doc in avgCursor:
+        pprint(doc)
+        currentAverage = doc['avg_age']
+
+    oldPlayerAge = oldPlayerState['age']
+    newPlayerAge = newPlayerState['age']
+
+    # More checking e.g player switch position, player marked invalid age
+    if oldPlayerAge > 0 and newPlayerAge > 0:
+        newPositionAvg = ((currentAverage * currentTotalPlayer) - oldPlayerAge + newPlayerAge) / currentTotalPlayer
+        print('New position age average: ', newPositionAvg)
+        db[postAvgAgeCollectionName].update_one({"sport_type": sportType, "position": position}, {"$set": {"avg_age": newPositionAvg}}, upsert=True)
+    else:
+        print('No updates to position age average')
 
 # MongoDB connection
 connection = Connect.get_connection()
@@ -279,6 +360,12 @@ db = connection.sports
 # Use Flask Framework to create REST endpoint
 app = Flask(__name__)
 api = Api(app)
+
+# Test method
+@app.route('/test', methods=['GET'])
+def test():
+    updateAgeAvgOnInsert(db, 'baseball', 'C')
+    return "hello"
 
 class SportPlayer(Resource):
     # Get a single sport player
@@ -293,6 +380,9 @@ class SportPlayer(Resource):
 
     # Create a new player
     # curl -i -H "Content-Type: application/json" -X POST -d '{"age": 35, "first_name":"Satoshi", "last_name":"Ketchum", "position":"C"}' http://localhost:5000/baseball/player/5000001
+    # curl -i -H "Content-Type: application/json" -X POST -d '{"age": 31, "first_name":"Lionel", "last_name":"Messi", "position":"F"}' http://localhost:5000/soccer/player/1
+    # curl -i -H "Content-Type: application/json" -X POST -d '{"age": 33, "first_name":"Cristiano", "last_name":"Ronaldo", "position":"F"}' http://localhost:5000/soccer/player/2
+    # curl -i -H "Content-Type: application/json" -X POST -d '{"age": 27, "first_name":"Antoine", "last_name":"Griezmann", "position":"F"}' http://localhost:5000/soccer/player/3
     def post(self,sportType, playerId):
         # Check if the player id exists in the backend
         player = getPlayer(db, sportType, playerId)
@@ -306,8 +396,14 @@ class SportPlayer(Resource):
                 'last_name': request.json['last_name'],
                 'position': request.json['position']
             }
+
+            # Update average age position collection
+            updateAgeAvgOnInsert(db, sportType, newPlayer)
+
+            # Insert player to sport collection
             db[sportType].insert_one(newPlayer)
             del newPlayer['_id']  # Remove MongoDB generated Object Id
+
             return jsonify({"player": newPlayer})  # 201 Created
             #return dumps(newPlayer), 200
         else:
@@ -315,6 +411,7 @@ class SportPlayer(Resource):
 
     # Delete a player
     # curl -i -H "Content-Type: application/json" -X DELETE http://localhost:5000/baseball/player/5000001
+    # curl -i -H "Content-Type: application/json" -X DELETE http://localhost:5000/soccer/player/2
     def delete(self, sportType, playerId):
         # Check if the player id exists in the backend
         player = getPlayer(db, sportType, playerId)
@@ -322,11 +419,15 @@ class SportPlayer(Resource):
         if player is None:
             return make_response(jsonify({'error': 'User does not exist'}), 404)  # Not Found
         else:
-            db[sportType].delete_one({'id': playerId})  # delete document from db
+            # Update avg position age
+            updateAgeAvgOnDelete(db, sportType, player)
+            # Delete document from db
+            db[sportType].delete_one({'id': playerId})
             return {}, 204  # No content
 
     # Update a player
     # curl -i -H "Content-Type: application/json" -X PUT -d '{"age": 35, "first_name":"Satoshi", "last_name":"Reddo", "position":"CF"}' http://localhost:5000/baseball/player/5000001
+    # curl -i -H "Content-Type: application/json" -X PUT -d '{"age": 50, "first_name":"Cristiano", "last_name":"Ronaldo", "position":"F"}' http://localhost:5000/soccer/player/2
     def put(self, sportType, playerId):
         # Check if the player id exists in the backend
         player = getPlayer(db, sportType, playerId)
@@ -340,7 +441,11 @@ class SportPlayer(Resource):
                 'last_name': request.json['last_name'],
                 'position': request.json['position']
             }
-            db[sportType].update_one({"id": playerId}, {"$set": updatePlayer}, upsert=False)  # update document from db
+
+            # Update avg position age
+            updateAgeAvgOnUpdate(db, sportType, player, updatePlayer)
+            # Update document in db
+            db[sportType].update_one({"id": playerId}, {"$set": updatePlayer}, upsert=False)
             return {}, 200  # No content
 
 
