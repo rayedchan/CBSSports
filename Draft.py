@@ -217,7 +217,8 @@ def getPlayer(db, sportType, playerId):
     cursor = db[sportType].find({"id" : playerId},  {"_id": 0})
 
     # Get number of documents from query
-    num = cursor.count()
+    #num = cursor.count() deprecated
+    num = db[sportType].count_documents({"id" : playerId})
     print(num)
 
     # There exist 1 document from query
@@ -349,6 +350,18 @@ def updateAgeAvgOnUpdate(db, sportType, oldPlayerState, newPlayerState):
     else:
         print('No updates to position age average')
 
+'''
+Function to trigger on update of a collection in MongoDB
+Post operation event
+op_document - document that is updated
+'''
+def notify_manager(op_document):
+    print('wake up! someone is adding me money')
+    print(op_document)
+
+    totalDocs = db['soccer'].count_documents({})
+    print('Total documents ', totalDocs)
+
 # MongoDB connection
 connection = Connect.get_connection()
 
@@ -364,7 +377,18 @@ api = Api(app)
 # Test method
 @app.route('/test', methods=['GET'])
 def test():
-    updateAgeAvgOnInsert(db, 'baseball', 'C')
+    # Connection must have oplog enable
+    # Start mongod with option --replSet rs and then execute rs.initiate() in mongo shell
+    triggers = MongoTrigger(connection)
+
+    # listens to update/insert/delete, any of these will trigger the callback
+    triggers.register_insert_trigger(notify_manager,'sports', 'soccer')  # register_op_trigger(func, db_name=None, collection_name=None)
+    triggers.tail_oplog()
+
+    print('test')
+    # make an operation to simulate interaction
+    connection['sports']['soccer'].insert_one({"balance": 1000})
+    #triggers.stop_tail()
     return "hello"
 
 class SportPlayer(Resource):
