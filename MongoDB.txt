@@ -1,8 +1,12 @@
 # Start MongoDB
-mongodb
+mongodb # no authentication
+mongodb --auth --dbpath /data/db  # Start Mongo with authentication
+mongod --auth --replSet rs  # replica set in order to have oplog rs.initiate()
 
-# Connect
+# Connect to MongoDB
 mongo
+mongo --port 27017 -u "admin" -p "Password1" --authenticationDatabase "admin"   # Connect to DB with user with auth db param
+mongo mongodb://localhost:27017/test?authSource=admin --username admin
 
 # Create user for db
 use admin;
@@ -16,32 +20,14 @@ db.createUser(
 
 db.createUser(
   {
-    user: "myUserAdmin",
-    pwd: "abc123",
-    roles: [ { role: "userAdminAnyDatabase", db: "admin" } ]
-  }
-)
-
-
-db.createUser(
-  {
     user: "admin",
     pwd: "Password1",
     roles: [ { role: "root", db: "admin" } ]
   }
-);
-
+)
 
 # Drop user
 db.dropUser("admin");
-
-# Start Mongo with authentication
-mongod --auth --dbpath /data/db
-
-# Connect to DB with user with auth db param
-mongo -u admin -p Password1
-mongo --port 27017 -u "admin" -p "Password1" --authenticationDatabase "admin"
-mongo mongodb://localhost:27017/test?authSource=admin --username admin
 
 # Import sample data
 mongoimport --db test --collection inventory \
@@ -67,7 +53,6 @@ db.inventory.insertOne(
      "size" : { "h" : 28, "w" : 35.5, "uom" : "cm" }
    }
 );
-
 
 # Insert multiple documents
 db.inventory.insertMany([
@@ -109,9 +94,7 @@ db.inventory.deleteMany(
     { "status" : "A" } // specifies the documents to delete
 )
 
-
-
-# Create database
+# Use / Create database
 use sports
 
 # Display all collections
@@ -124,31 +107,10 @@ db.<collectionName>.drop()
 # Create collection
 db.createCollection('<CollectionName>')
 
-
 # Count number documents in a collection
 db.<collectionName>.count()
-
 
 # Aggregate functions
 # $avg ignores non-numeric values, including missing values
 db.baseball.aggregate([{$group: {_id : "$position", avg_age: {$avg: "$age"}}}])
-
-
-
-# Sample stuff
-use sports
-db.auth("admin", "Password1")
-db.foo.insert({x:1})
-db.foo.find({})
-
-
-# {'DH': 32.36363636363637, 'OF': 25.64864864864865, '3B': 26.46268656716418, 'LF': 26.855263157894736,
-# 'CF': 26.0, 'C': 27.240343347639485, 'P': 26.216494845360824, 'RF': 26.73972602739726, '1B': 27.454545454545453,
-# 'SS': 25.6536312849162, '2B': 26.962025316455698, 'SP': 26.564102564102566, 'RP': 27.988165680473372, 'PS': None}
-
-
-
-
-
-
 

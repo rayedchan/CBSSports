@@ -10,8 +10,11 @@ from flask import Flask, jsonify, make_response, abort, request
 from flask_restful import Api, Resource, reqparse
 from bson.json_util import dumps
 from mongotriggers import MongoTrigger
+import os
 
+# Name of collection to store position age averages
 postAvgAgeCollectionName = 'positionAvgAge'
+databaseName = 'sports'
 
 """
 Get all type of sports from REST API call
@@ -121,7 +124,7 @@ def getAllAvgPositionAge(db, collectionName):
 
     return result
 '''
-Setup the average ave position collection which stores average age per position
+Setup the average age position collection which stores average age per position
 for all sports
 '''
 def setupAvgPositionCollection(db, sportsJSON):
@@ -228,7 +231,6 @@ def getPlayer(db, sportType, playerId):
 
         # Add the calculated fields to JSON object
         player["name_brief"] = deriveNameBrief(player['first_name'], player['last_name'], sportType)
-        #TODO: Update code to get player average
 
         # Check if player age exists
         if player['age']:
@@ -272,6 +274,10 @@ def getAllPlayers(db, sportName):
 # New AVG on insert of new player = ((CA * CTP) + NPA) / (CTP + 1)
 # New AVG on deletion of player = ((CA * CTP)  - PA / (CTP - 1)
 # New AVG on update of player age = (CA * CTP) - OPA + NA / CTP
+
+'''
+Function to update position age average on insert of new document
+'''
 def updateAgeAvgOnInsert(db, sportType, newPlayer):
     position = newPlayer['position']
     print(position)
@@ -296,6 +302,9 @@ def updateAgeAvgOnInsert(db, sportType, newPlayer):
     else:
         print('No updates to position age average')
 
+'''
+Function to update position age average on deletion of a document
+'''
 def updateAgeAvgOnDelete(db, sportType, rmPlayer):
     position = rmPlayer['position']
     print(position)
@@ -323,6 +332,9 @@ def updateAgeAvgOnDelete(db, sportType, rmPlayer):
     else:
         print('No updates to position age average')
 
+'''
+Function to update position age average on update of an existing document
+'''
 def updateAgeAvgOnUpdate(db, sportType, oldPlayerState, newPlayerState):
     position = oldPlayerState['position']
     print(position)
@@ -351,6 +363,39 @@ def updateAgeAvgOnUpdate(db, sportType, oldPlayerState, newPlayerState):
         print('No updates to position age average')
 
 '''
+Function to setup triggers on collection
+mongotriggers limited in capabilities since every operation in oplog post event
+'''
+def setup_triggers(connection):
+    envWerk = os.environ.get("WERKZEUG_RUN_MAIN")
+    print('Value of WERKZEUG', envWerk)
+
+    # The app is not in debug mode or we are in the reloaded process
+    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+        # Setup triggers
+        # Connection must have oplog enable
+        # Start mongod with option --replSet rs and then execute rs.initiate() in mongo shell
+        triggers = MongoTrigger(connection)
+
+        sportCollections = connection[databaseName].list_collection_names()
+
+        # Put a trigger on each sport collection on insert operation
+        for sport in sportCollections:
+            # skip position average age collection
+            if sport == postAvgAgeCollectionName:
+                continue
+
+            print(sport)
+            triggers.register_insert_trigger(insert_trigger, databaseName, sport)  # register_op_trigger(func, db_name=None, collection_name=None)
+            #triggers.register_update_trigger(notify_manager, databaseName, sport)
+            #triggers.register_delete_trigger(notify_manager, databaseName, sport)
+
+        # listens to update/insert/delete by tailing operation log, any of these will trigger the callback
+        triggers.tail_oplog()
+    else:
+        print('setup_triggers function has been called already')
+
+'''
 Function to trigger on update of a collection in MongoDB
 Post operation event
 op_document - document that is updated
@@ -359,8 +404,40 @@ def notify_manager(op_document):
     print('wake up! someone is adding me money')
     print(op_document)
 
-    totalDocs = db['soccer'].count_documents({})
-    print('Total documents ', totalDocs)
+    #totalDocs = db['soccer'].count_documents({})
+    #print('Total documents ', totalDocs)
+
+def insert_trigger(op_document):
+    position = op_document['o']['position']
+    print(position)
+
+    collectionName = op_document['ns'].split(".")[1]
+    print(collectionName)
+
+    # Get total number of documents for specific position with valid age
+    currentTotalPlayer = db[collectionName].count_documents({"position": position, "age": {"$gt": 0}})
+    print('Total players ', currentTotalPlayer)
+
+    # Get current average for position
+    avgCursor = db[postAvgAgeCollectionName].find({"sport_type": collectionName, "position": position})
+    currentAverage = 0
+    # Iterate results
+    for doc in avgCursor:
+        pprint(doc)
+        currentAverage = doc['avg_age']
+
+    newPlayerAge = op_document['o']['age']
+    if newPlayerAge > 0:
+        newPositionAvg = ((currentAverage * (currentTotalPlayer - 1)) + newPlayerAge) / currentTotalPlayer
+        print('New position age average: ', newPositionAvg)
+        db[postAvgAgeCollectionName].update_one({"sport_type": collectionName, "position": position}, {"$set": {"avg_age": newPositionAvg}}, upsert=True)
+    else:
+        print('No updates to position age average')
+
+
+# Use Flask Framework to create REST endpoint
+app = Flask(__name__)
+api = Api(app)
 
 # MongoDB connection
 connection = Connect.get_connection()
@@ -370,24 +447,27 @@ db = connection.sports
 
 #initializeBackend(db)
 
-# Use Flask Framework to create REST endpoint
-app = Flask(__name__)
-api = Api(app)
+setup_triggers(connection)
 
 # Test method
 @app.route('/test', methods=['GET'])
 def test():
-    # Connection must have oplog enable
-    # Start mongod with option --replSet rs and then execute rs.initiate() in mongo shell
-    triggers = MongoTrigger(connection)
-
-    # listens to update/insert/delete, any of these will trigger the callback
-    triggers.register_insert_trigger(notify_manager,'sports', 'soccer')  # register_op_trigger(func, db_name=None, collection_name=None)
-    triggers.tail_oplog()
-
-    print('test')
     # make an operation to simulate interaction
+    #{'ts': Timestamp(1534294127, 1), 't': 4, 'h': 365521937056847418, 'v': 2, 'op': 'i', 'ns': 'sports.soccer',
+    # 'ui': UUID('b1ef1848-d533-4f82-a755-efd25365956a'),
+    # 'wall': datetime.datetime(2018, 8, 15, 0, 48, 47, 548000), 'o': {'_id': ObjectId('5b73786fa17e67091f89236c'), 'balance': 1000}}
     connection['sports']['soccer'].insert_one({"balance": 1000})
+
+    # {'ts': Timestamp(1534293692, 1), 't': 4, 'h': -5215787170296186624, 'v': 2, 'op': 'u', 'ns': 'sports.soccer',
+    # 'ui': UUID('b1ef1848-d533-4f82-a755-efd25365956a'), 'o2': {'_id': ObjectId('5b7371f5a17e6708dd7fc1ee')},
+    #  'wall': datetime.datetime(2018, 8, 15, 0, 41, 32, 354000), 'o': {'$v': 1, '$set': {'num': 100}}}
+    #connection['sports']['soccer'].update_one({"balance": 1000}, {"$set":{"num": 100}})
+
+    # {'ts': Timestamp(1534294257, 1), 't': 4, 'h': -434037455564944914, 'v': 2, 'op': 'd', 'ns': 'sports.soccer',
+    # 'ui': UUID('b1ef1848-d533-4f82-a755-efd25365956a'),
+    # 'wall': datetime.datetime(2018, 8, 15, 0, 50, 57, 430000), 'o': {'_id': ObjectId('5b7378d8a17e67093e2afe78')}}
+    #connection['sports']['soccer'].delete_one({"balance": 1000})
+
     #triggers.stop_tail()
     return "hello"
 
@@ -422,7 +502,7 @@ class SportPlayer(Resource):
             }
 
             # Update average age position collection
-            updateAgeAvgOnInsert(db, sportType, newPlayer)
+            # updateAgeAvgOnInsert(db, sportType, newPlayer)
 
             # Insert player to sport collection
             db[sportType].insert_one(newPlayer)
@@ -539,8 +619,8 @@ def not_found(error):
     return make_response(jsonify({'error': 'Not found'}), 404)
 
 # Debug mode, enables reload automatically
+# Flask service will initialise twice, use_reloader=False will prevent that
 app.run(debug =True)
-
 
 #results = getAllAvgPositionAge(db, "baseball")
 #print(results)
