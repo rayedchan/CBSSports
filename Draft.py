@@ -6,7 +6,7 @@ from pymongo import MongoClient
 from pprint import pprint
 from bson.son import SON
 from Player import Player
-from flask import Flask, jsonify, make_response, abort, request
+from flask import Flask, jsonify, make_response, abort, request, render_template
 from flask_restful import Api, Resource, reqparse
 from bson.json_util import dumps
 from mongotriggers import MongoTrigger
@@ -407,6 +407,10 @@ def notify_manager(op_document):
     #totalDocs = db['soccer'].count_documents({})
     #print('Total documents ', totalDocs)
 
+'''
+Trigger function to be called on every insertion of a new document into
+any sport collection
+'''
 def insert_trigger(op_document):
     position = op_document['o']['position']
     print(position)
@@ -448,6 +452,10 @@ db = connection.sports
 #initializeBackend(db)
 
 setup_triggers(connection)
+
+@app.route('/')
+def showPlayers():
+    return render_template('list.html')
 
 # Test method
 @app.route('/test', methods=['GET'])
@@ -560,9 +568,9 @@ api.add_resource(SportPlayer, "/<string:sportType>/player/<string:playerId>")
 def getAllSportPlayers(sportName):
     playerList = getAllPlayers(db, sportName)
     # return formatted JSON
-    return jsonify({'players': playerList}), 200
+    # return jsonify({'players': playerList}), 200
     # return compressed json
-    #return json.dumps({'results': playerList}), 200
+    return json.dumps(playerList)
 
 # Get all types of sports
 @app.route('/sports', methods=['GET'])
