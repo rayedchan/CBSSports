@@ -582,7 +582,8 @@ def getAllSportTypes():
      sportList.remove(postAvgAgeCollectionName)
      #pprint(sportList)
 
-     return jsonify({"sports": sportList}), 200
+     #return jsonify({"sports": sportList}), 200
+     return json.dumps(sportList), 200
 
 # Get a specific sport
 @app.route('/sports/<string:sportType>', methods=['GET'])

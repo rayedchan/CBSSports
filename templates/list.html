@@ -11,10 +11,28 @@
     <script>
          angular.module('myApp', []).controller('HomeCtrl', function($scope, $http){
 
-            $scope.showlist = function() {
+            // Make REST call to fetch all the different types of sports
+            $scope.showSportList = function() {
                 $http({
                     method: 'GET',
-                    url: '/sports/soccer/players',
+                    url: '/sports',
+                }).then(function(response) {
+                    // Set scope sports field to JSON data returned from rest endpoint
+                    $scope.sports = response.data;
+                    console.log('sports', $scope.sports);
+                    // Default option on initial load
+                    $scope.sport_type = $scope.selected
+                }, function(error) {
+                    console.log(error);
+                });
+            }
+
+
+            // Makes REST call to fetch all the players for a specific sport
+            $scope.showPlayerList = function() {
+                $http({
+                    method: 'GET',
+                    url: '/sports/'+ $scope.sport_type +'/players',
 
                 }).then(function(response) {
                     $scope.players = response.data;
@@ -24,7 +42,9 @@
                 });
             }
 
-            $scope.showlist();
+            $scope.showSportList();
+            //console.log('sport type', $scope.sport_type);
+            //$scope.showPlayerList();
 
          })
     </script>
@@ -32,7 +52,18 @@
 </head>
 <body ng-controller="HomeCtrl">
     <div class="container">
-        <div class="panel-heading">Sport Players</div>
+        <h3 class="text-muted">Sport Players</h3>
+
+        <p>
+            <!-- ng-model has current value of selected option, ng-options generate all option, ng-change when selected option is changed call function  -->
+            <select ng-model="sport_type" ng-options="sport as sport for sport in sports" ng-change="showPlayerList()">
+                <!--<option ng-repeat="sport in sports" value="{{ '{{sport}}' }}">{{ '{{sport}}' }}</option>>-->
+                <option value="" ng-selected="selected" selected disabled>Please select one</option>
+            </select>
+        </p>
+
+
+        <div class="panel-heading"></div>
             <table class="table">
                 <thead>
                     <tr>
