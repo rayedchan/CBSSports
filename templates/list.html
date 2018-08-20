@@ -6,22 +6,27 @@
     <meta name="author" content="rayedchan">
     <title>Sport Players</title>
     <link href="static/css/bootstrap.min.css" rel="stylesheet">
+    <link href="static/css/mycss.css" rel="stylesheet">
     <script src="static/js/angular.min.js"></script>
 
     <script>
          angular.module('myApp', []).controller('HomeCtrl', function($scope, $http){
 
+            $scope.player = {};
+
             // Make REST call to fetch all the different types of sports
             $scope.showSportList = function() {
                 $http({
                     method: 'GET',
-                    url: '/sports',
+                    url: '/sports'
                 }).then(function(response) {
                     // Set scope sports field to JSON data returned from rest endpoint
                     $scope.sports = response.data;
                     console.log('sports', $scope.sports);
+
                     // Default option on initial load
                     $scope.sport_type = $scope.selected
+
                 }, function(error) {
                     console.log(error);
                 });
@@ -32,8 +37,7 @@
             $scope.showPlayerList = function() {
                 $http({
                     method: 'GET',
-                    url: '/sports/'+ $scope.sport_type +'/players',
-
+                    url: '/sports/'+ $scope.sport_type +'/players'
                 }).then(function(response) {
                     $scope.players = response.data;
                     console.log('players', $scope.players);
@@ -42,7 +46,32 @@
                 });
             }
 
+            // Form popup
+            $scope.showAddPopUp = function(){
+					$scope.showAdd = true; // show add player button
+					$scope.player = {}; // empty player object
+					$('#addPopUp').modal('show') // show popup form
+				}
+
+		    // Make REST call to add sport player
+			$scope.addPlayer = function() {
+					$http({
+						method: 'POST',
+						url: '/' + $scope.sport_type + '/player/' + $scope.player.id,
+						data: $scope.player
+					}).then(function(response) {
+					    console.log('add player sport type', $scope.sport_type);
+						$scope.showPlayerList(); // refresh player list
+						$('#addPopUp').modal('hide'); // hide pop up form
+						$scope.player = {}; // empty player object
+					}, function(error) {
+						console.log(error);
+					});
+			}
+
+            // Populate drop down with all the type of sports
             $scope.showSportList();
+
             //console.log('sport type', $scope.sport_type);
             //$scope.showPlayerList();
 
@@ -54,15 +83,25 @@
     <div class="container">
         <h3 class="text-muted">Sport Players</h3>
 
-        <p>
-            <!-- ng-model has current value of selected option, ng-options generate all option, ng-change when selected option is changed call function  -->
-            <select ng-model="sport_type" ng-options="sport as sport for sport in sports" ng-change="showPlayerList()">
-                <!--<option ng-repeat="sport in sports" value="{{ '{{sport}}' }}">{{ '{{sport}}' }}</option>>-->
-                <option value="" ng-selected="selected" selected disabled>Please select one</option>
-            </select>
-        </p>
+        <!-- Operation Menu -->
+        <div>
+            <ul class="navbar">
+                <li>
+                    <!-- ng-model has current value of selected option, ng-options generate all option, ng-change when selected option is changed call function  -->
+                    <select ng-model="sport_type" ng-options="sport as sport for sport in sports" ng-change="showPlayerList()">
+                        <!--<option ng-repeat="sport in sports" value="{{ '{{sport}}' }}">{{ '{{sport}}' }}</option>>-->
+                        <option value="" ng-selected="selected" selected disabled>Please select one</option>
+                    </select>
+                </li>
+                 <li>
+                    <button type="button" class="btn btn-success" data-toggle="modal" ng-click="showAddPopUp()">Add</button>
+                </li>
+            </ul>
+        </div>
 
+        <br />
 
+        <!-- Display Sport Player Table -->
         <div class="panel-heading"></div>
             <table class="table">
                 <thead>
@@ -91,6 +130,53 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- Add Player Popup-->
+         <div class="modal fade" id="addPopUp" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+
+                    <!-- Header -->
+                    <div class="modal-header">
+                        <h4 class="modal-title" id="exampleModalLabel">Add Sport Player</h4>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    </div>
+
+                    <!-- Input Form -->
+                    <div class="modal-body">
+                        <form>
+                            <div class="form-group">
+                                <label for="txtID" class="control-label">ID:</label>
+                                <input type="text" class="form-control" ng-model="player.id" id="txtID">
+                            </div>
+                            <div class="form-group">
+                                <label for="txtFirstName" class="control-label">First Name:</label>
+                                <input type="text" class="form-control" ng-model="player.first_name" id="txtFirstName">
+                            </div>
+                            <div class="form-group">
+                                <label for="txtLastName" class="control-label">Last Name:</label>
+                                <input type="text" class="form-control" ng-model="player.last_name" id="txtLastName">
+                            </div>
+                            <div class="form-group">
+                                <label for="txtAge" class="control-label">Age:</label>
+                                <input type="number" class="form-control" ng-model="player.age" id="txtAge">
+                            </div>
+                            <div class="form-group">
+                                <label for="txtPosition" class="control-label">Position:</label>
+                                <input type="text" class="form-control" ng-model="player.position" id="txtPosition">
+                            </div>
+                        </form>
+                    </div>
+
+                    <!--Submit button -->
+                    <div class="modal-footer">
+                        <button ng-show="showAdd" id="btnAdd" ng-click="addPlayer()" type="button" class="btn btn-primary">Add Player</button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
     <script src="static/js/jquery-3.3.1.min.js"></script>
     <script src="static/js/bootstrap.min.js"></script>
 </body>
