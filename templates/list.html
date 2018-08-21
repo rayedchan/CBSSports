@@ -5,9 +5,11 @@
     <meta name="description" content="Shows list of sport players">
     <meta name="author" content="rayedchan">
     <title>Sport Players</title>
-    <link href="static/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="static/css/bootstrap.min.css">
     <link href="static/css/mycss.css" rel="stylesheet">
     <script src="static/js/angular.min.js"></script>
+    <script src="static/js/jquery-3.3.1.min.js"></script>
+    <script src="static/js/bootstrap.min.js"></script>
 
     <script>
          angular.module('myApp', []).controller('HomeCtrl', function($scope, $http){
@@ -46,7 +48,7 @@
                 });
             }
 
-            // Form popup
+            // Form popup for add
             $scope.showAddPopUp = function(){
 					$scope.showAdd = true; // show add player button
 					$scope.player = {}; // empty player object
@@ -68,6 +70,27 @@
 						console.log(error);
 					});
 			}
+
+			// Delete form popup
+            $scope.confirmDelete = function(id){
+                $scope.delPlayerId = id; // set id to be deleted
+                $('#deleteConfirm').modal('show'); // show delete confirmation popup
+            }
+
+            // Make REST API call to remove player
+            $scope.deletePlayer = function(){
+					$http({
+						method: 'DELETE',
+						url: '/' + $scope.sport_type + '/player/' + $scope.delPlayerId
+					}).then(function(response) {
+						console.log(response.data);
+						$scope.delPlayerId = ''; // unset delete id
+						$scope.showPlayerList(); // refresh player list
+						$('#deleteConfirm').modal('hide') // hide delete popup
+					}, function(error) {
+						console.log(error);
+					});
+				}
 
             // Populate drop down with all the type of sports
             $scope.showSportList();
@@ -94,7 +117,8 @@
                     </select>
                 </li>
                  <li>
-                    <button type="button" class="btn btn-success" data-toggle="modal" ng-click="showAddPopUp()">Add</button>
+                     <!-- Add button will be active when a sport type is selected from select options-->
+                    <button type="button" class="btn btn-success" data-toggle="modal" ng-click="showAddPopUp()" ng-disabled="!sport_type || sport_type.length == 0">Add</button>
                 </li>
             </ul>
         </div>
@@ -114,6 +138,7 @@
                         <th>Position</th>
                         <th>Brief Name</th>
                         <th>Average Age Difference</th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -126,6 +151,7 @@
                         <td>{{ '{{player.position}}' }}</td>
                         <td>{{ '{{player.name_brief}}' }}</td>
                         <td>{{ '{{player.average_position_age_diff}}' }}</td>
+                        <td><button type="button" class="close" ng-click="confirmDelete(player.id)" aria-label="Close"><span aria-hidden="true">&times;</span></button></td>
                     </tr>
                 </tbody>
             </table>
@@ -177,7 +203,23 @@
             </div>
         </div>
 
-    <script src="static/js/jquery-3.3.1.min.js"></script>
-    <script src="static/js/bootstrap.min.js"></script>
+        <!-- Delete Player popup -->
+        <div id="deleteConfirm" class="modal fade bs-example-modal-md in" tabindex="-1" role="dialog" aria-labelledby="myLargeModalLabel">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Delete Player</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">×</span></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Are you sure you want to delete this player?</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" ng-click="deletePlayer()" class="btn btn-primary">Delete</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
 </body>
 </html>
