@@ -450,8 +450,7 @@ connection = Connect.get_connection()
 db = connection.sports
 
 #initializeBackend(db)
-
-setup_triggers(connection)
+#setup_triggers(connection)
 
 @app.route('/')
 def showPlayers():
@@ -488,7 +487,8 @@ class SportPlayer(Resource):
         if player is None:
             abort(404)  # 404 Resource Not Found
 
-        return jsonify({"player": player}), 200
+        #return jsonify({"player": player}), 200
+        return json.dumps(player)
 
     # Create a new player
     # curl -i -H "Content-Type: application/json" -X POST -d '{"age": 35, "first_name":"Satoshi", "last_name":"Ketchum", "position":"C"}' http://localhost:5000/baseball/player/5000001
@@ -510,7 +510,7 @@ class SportPlayer(Resource):
             }
 
             # Update average age position collection
-            # updateAgeAvgOnInsert(db, sportType, newPlayer)
+            updateAgeAvgOnInsert(db, sportType, newPlayer)
 
             # Insert player to sport collection
             db[sportType].insert_one(newPlayer)
