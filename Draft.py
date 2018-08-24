@@ -337,28 +337,112 @@ Function to update position age average on update of an existing document
 '''
 def updateAgeAvgOnUpdate(db, sportType, oldPlayerState, newPlayerState):
     position = oldPlayerState['position']
-    print(position)
-
-    # Get total number of documents for specific position with valid age
-    currentTotalPlayer = db[sportType].count_documents({"position": position, "age": {"$gt": 0}})
-    print('Total players ', currentTotalPlayer)
-
-    # Get current average for position
-    avgCursor = db[postAvgAgeCollectionName].find({"sport_type": sportType, "position": position})
+    newPosition = newPlayerState['position']
+    currentTotalPlayer = 0
     currentAverage = 0
-    # Iterate results
-    for doc in avgCursor:
-        pprint(doc)
-        currentAverage = doc['avg_age']
+    npCurrentAverage = 0
+    npCurrentTotalPlayer = 0
+
+    # Empty positions
+    if position is None and newPosition is None:
+        print('No updates to position age average since position is invalid')
+        return
+
+    # Position are the same or old position is valid but new position is invalid
+    elif position == newPosition or (position is not None and newPosition is None):
+        # Get total number of documents for specific position with valid age
+        currentTotalPlayer = db[sportType].count_documents({"position": position, "age": {"$gt": 0}})
+        print('Total players ', currentTotalPlayer)
+
+        # Get current average for position
+        avgCursor = db[postAvgAgeCollectionName].find({"sport_type": sportType, "position": position})
+
+        # Iterate results
+        for doc in avgCursor:
+            pprint(doc)
+            currentAverage = doc['avg_age']
+
+    # Old position invalid and new position valid
+    elif position is None and newPosition is not None:
+        # Get total number of documents for specific position with valid age
+        currentTotalPlayer = db[sportType].count_documents({"position": newPosition, "age": {"$gt": 0}})
+        print('Total players ', currentTotalPlayer)
+
+        # Get current average for position
+        avgCursor = db[postAvgAgeCollectionName].find({"sport_type": sportType, "position": newPosition})
+
+        # Iterate results
+        for doc in avgCursor:
+            pprint(doc)
+            currentAverage = doc['avg_age']
+
+    # Change to different position
+    else:
+        # Get total number of documents for specific position with valid age
+        currentTotalPlayer = db[sportType].count_documents({"position": position, "age": {"$gt": 0}})
+        print('Total players ', currentTotalPlayer)
+
+        # Get current average for position
+        avgCursor = db[postAvgAgeCollectionName].find({"sport_type": sportType, "position": position})
+
+        # Iterate results
+        for doc in avgCursor:
+            pprint(doc)
+            currentAverage = doc['avg_age']
+
+        # Get total number of documents for specific position with valid age
+        npCurrentTotalPlayer = db[sportType].count_documents({"position": newPosition, "age": {"$gt": 0}})
+        print('Total players ', npCurrentTotalPlayer)
+
+        # Get current average for position
+        npAvgCursor = db[postAvgAgeCollectionName].find({"sport_type": sportType, "position": newPosition})
+
+        # Iterate results
+        for doc in npAvgCursor:
+            pprint(doc)
+            npCurrentAverage = doc['avg_age']
 
     oldPlayerAge = oldPlayerState['age']
     newPlayerAge = newPlayerState['age']
 
+    # Different Position case
+    if position is not None and newPosition is not None and position != newPosition:
+        print('Player changed positions')
+        newAvgForOldPosition = 0
+        newAvgForNewPosition = 0
+
+        # No players in the old position
+        if (currentTotalPlayer - 1) <= 0:
+            newAvgForOldPosition = 0
+        else:
+            newAvgForOldPosition = ((currentAverage * currentTotalPlayer) - oldPlayerAge) / (currentTotalPlayer - 1)
+        print('Updated Old position age average: ', newAvgForOldPosition)
+        db[postAvgAgeCollectionName].update_one({"sport_type": sportType, "position": position},{"$set": {"avg_age": newAvgForOldPosition}}, upsert=True)
+
+        newAvgForNewPosition = ((npCurrentAverage * npCurrentTotalPlayer) + newPlayerAge) / (npCurrentTotalPlayer + 1)
+        print('Updated new position age average: ', newAvgForNewPosition)
+        db[postAvgAgeCollectionName].update_one({"sport_type": sportType, "position": newPosition},{"$set": {"avg_age": newAvgForNewPosition}}, upsert=True)
+
+    # Subtract player from calculation since age/position is cleared or invalid
+    elif newPosition is None or newPlayerAge is None or newPlayerAge == 0:
+        print('Player age is cleared or new position is empty')
+        newPositionAvg = ((currentAverage * currentTotalPlayer) - oldPlayerAge) / (currentTotalPlayer - 1)
+        print('New position age average: ', newPositionAvg)
+        db[postAvgAgeCollectionName].update_one({"sport_type": sportType, "position": position},{"$set": {"avg_age": newPositionAvg}}, upsert=True)
+
+    # Player from invalid age/position to a valid age/position
+    elif (position is None or oldPlayerAge is None or oldPlayerAge == 0) and newPlayerAge > 0:
+        print('Player age/position is valid')
+        newPositionAvg = ((currentAverage * currentTotalPlayer) + newPlayerAge) / (currentTotalPlayer + 1)
+        print('New position age average: ', newPositionAvg)
+        db[postAvgAgeCollectionName].update_one({"sport_type": sportType, "position": position},{"$set": {"avg_age": newPositionAvg}}, upsert=True)
+
     # More checking e.g player switch position, player marked invalid age
-    if oldPlayerAge > 0 and newPlayerAge > 0:
+    elif oldPlayerAge > 0 and newPlayerAge > 0:
         newPositionAvg = ((currentAverage * currentTotalPlayer) - oldPlayerAge + newPlayerAge) / currentTotalPlayer
         print('New position age average: ', newPositionAvg)
-        db[postAvgAgeCollectionName].update_one({"sport_type": sportType, "position": position}, {"$set": {"avg_age": newPositionAvg}}, upsert=True)
+        db[postAvgAgeCollectionName].update_one({"sport_type": sportType, "position": position},{"$set": {"avg_age": newPositionAvg}}, upsert=True)
+
     else:
         print('No updates to position age average')
 
