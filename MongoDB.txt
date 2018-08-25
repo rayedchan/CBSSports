@@ -3,6 +3,13 @@ mongodb # no authentication
 mongodb --auth --dbpath /data/db  # Start Mongo with authentication
 mongod --auth --replSet rs  # replica set in order to have oplog rs.initiate()
 
+#Switch MongoDB version on Mac
+brew unlink mongodb
+brew link --force mongodb@3.6
+
+brew unlink mongodb@3.6
+brew link mongodb
+
 # Connect to MongoDB
 mongo
 mongo --port 27017 -u "admin" -p "Password1" --authenticationDatabase "admin"   # Connect to DB with user with auth db param
