@@ -498,5 +498,5 @@ def not_found(error):
 
 # Debug mode, enables reload automatically
 # Flask service will initialise twice, use_reloader=False will prevent that
-app.run(debug =True)
-
+# app.run(debug =True)
+app.run()
