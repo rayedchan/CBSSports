@@ -9,13 +9,42 @@ from pprint import pprint
 
 # Name of collection to store position age averages
 postAvgAgeCollectionName = 'positionAvgAge'
+
+# Name of collection to store all the sports
+sportCollectionName = 'sport'
+
+# Get database name form environment variable
 databaseName = os.environ.get("MONGODB_DBNAME")
+
+"""
+Create collection to store all the possible sports
+sportsJSON: {'body': {'sports': [{'name': 'Baseball', 'pro_abbrev': 'MLB', 'id': 'baseball'}, {'name': 'Football', 'pro_abbrev': 'NFL', 'id': 'football'}, {'name': 'Hockey', 'pro_abbrev': 'NHL', 'id': 'hockey'}, {'name': 'Basketball', 'pro_abbrev': 'NBA', 'id': 'basketball'}, {'name': 'College Football', 'pro_abbrev': 'NCAAF', 'id': 'collegefb'}]}, 'uriAlias': '/sports', 'statusMessage': 'OK', 'uri': '/sports', 'statusCode': 200}
+"""
+def createSportCollection(db, sportsJSON):
+    # Get the existing collections in database
+    existingCollections = db.list_collection_names()
+    print("Existing collections:", existingCollections)
+
+    # Create collection if it does not exist
+    if sportCollectionName not in existingCollections:
+        db.create_collection(sportCollectionName)
+        print(sportCollectionName, 'collection created.')
+    else:
+        print(sportCollectionName, 'collection already exists in database.')
+
+    # Add sport documents
+    for sport in sportsJSON['body']['sports']:
+        id = sport['id']
+        # Updates the document if it exists else insert new document
+        # Search filter uses id to find existing document
+        db[sportCollectionName].update_one({"id": id}, {"$set": sport}, upsert=True)
+        print('Upsert', sport)
 
 """
 Create database collection for each type of sport
 Also, create collection to store average age for every position
 """
-def createSportsCollections(db, sportsJSON):
+def createSportTypeCollections(db, sportsJSON):
     # Get the existing collections in database
     existingCollections = db.list_collection_names()
     print("Existing collections:", existingCollections)
@@ -38,6 +67,18 @@ def createSportsCollections(db, sportsJSON):
         print(postAvgAgeCollectionName, 'collection created.')
     else:
         print(postAvgAgeCollectionName, 'collection already exists in database.')
+
+'''
+Remove all collections in database
+'''
+def cleanup(db):
+    # Get the existing collections in database
+    existingCollections = db.list_collection_names()
+    print("Existing collections:", existingCollections)
+
+    for collectionName in existingCollections:
+        db.drop_collection(collectionName)
+        print("Removed collection: ", collectionName)
 
 """
 Given a type of sport, insert player into proper sport collection
@@ -107,16 +148,20 @@ def setupAvgPositionCollection(db, sportsJSON):
 
 '''
 Setup the backend layer
-1. Setup the sport collections with sport players documents added
-2. Setup a average collection containing average avg per position for all sports
+1. Create sports collection storing all possible sports
+2. Create a collection for each sport type and add players documents accordingly
+3. Setup a average collection containing average avg per position for all sports
 '''
 def initializeBackend(db):
     # Sports JSON data
     sportsJSON = getAllSports()
     print(sportsJSON)
 
-    # Create collections
-    createSportsCollections(db, sportsJSON)
+    # Create the sport collection
+    createSportCollection(db, sportsJSON)
+
+    # Create collections for each type of sport
+    createSportTypeCollections(db, sportsJSON)
 
     for sport in sportsJSON['body']['sports']:
         #print(sport)
@@ -126,6 +171,7 @@ def initializeBackend(db):
     # Sports JSON data
     sportsJSON = getAllSports()
     setupAvgPositionCollection(db, sportsJSON)
+
 
 '''
 Function to setup triggers on collection
@@ -200,4 +246,4 @@ db = connection[databaseName]
 
 initializeBackend(db)
 #setup_triggers(connection)
-
+#cleanup(db)

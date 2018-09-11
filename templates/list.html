@@ -144,7 +144,7 @@
             <ul class="navbar">
                 <li>
                     <!-- ng-model has current value of selected option, ng-options generate all option, ng-change when selected option is changed call function  -->
-                    <select ng-model="sport_type" ng-options="sport as sport for sport in sports" ng-change="showPlayerList()">
+                    <select ng-model="sport_type" ng-options="sport.id as sport.name for sport in sports" ng-change="showPlayerList()">
                         <!--<option ng-repeat="sport in sports" value="{{ '{{sport}}' }}">{{ '{{sport}}' }}</option>>-->
                         <option value="" ng-selected="selected" selected disabled>Please select one</option>
                     </select>

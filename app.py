@@ -16,8 +16,8 @@ from CommonUtils import getAllSports
 postAvgAgeCollectionName = 'positionAvgAge'
 databaseName = os.environ.get("MONGODB_DBNAME")
 
-# TODO: Restructure backend layer so that this won't be necessary
-excludeCollections = ['system.indexes']
+# Name of collection to store all the sports
+sportCollectionName = 'sport'
 
 '''
 Get the average age for a specific position from average avg collection
@@ -441,18 +441,20 @@ def getAllSportPlayers(sportName):
 # Get all types of sports
 @app.route('/sports', methods=['GET'])
 def getAllSportTypes():
-     # Get all collections within a database
-     sportList = db.list_collection_names()
-
-     # Remove average collection from list
-     sportList.remove(postAvgAgeCollectionName)
-
-     for excludeCol in excludeCollections:
-         sportList.remove(excludeCol)
-         #pprint(sportList)
+     # Get all sports available
+     sportList = db[sportCollectionName].find({})
 
      #return jsonify({"sports": sportList}), 200
-     return json.dumps(sportList), 200
+     return dumps(sportList), 200
+
+# Get all  collections
+@app.route('/collections', methods=['GET'])
+def getAllSportTypeCollections():
+     # Get all collections within a database
+     collections = db.list_collection_names()
+
+     #return jsonify({"sports": sportList}), 200
+     return json.dumps(collections), 200
 
 # Get a specific sport
 @app.route('/sports/<string:sportType>', methods=['GET'])
@@ -467,13 +469,14 @@ def getSportType(sportType):
     abort(404)
 
 # Create a new sport collection
-# curl -i -H "Content-Type: application/json" -X POST -d '{"sport_type":"soccer"}' http://localhost:5000/sports
+# curl -i -H "Content-Type: application/json" -X POST -d '{"id":"soccer", "name":"Soccer", "pro_abbrev":"FIFA"}' http://localhost:5000/sports
 @app.route('/sports', methods=['POST'])
 def createSport():
-    if not request.json or not 'sport_type' in request.json:
+    if not request.json or not 'id' in request.json:
         abort(400) # 400 Bad request
-    db.create_collection(request.json['sport_type'])
-    return jsonify({'sport': request.json['sport_type']}), 201 # 201 Created
+    db[sportCollectionName].update_one({"id": request.json['id']}, {"$set": request.json}, upsert=True) # insert new sport into sport collection
+    db.create_collection(request.json['id']) # create new sport type collection
+    return jsonify({'sport': request.json['id']}), 201 # 201 Created
 
 # Delete a sport
 # curl -i -H "Content-Type: application/json" -X DELETE http://localhost:5000/sports/soccer
@@ -500,4 +503,4 @@ def not_found(error):
 # Flask service will initialise twice, use_reloader=False will prevent that
 # app.run(debug =True)
 if __name__ == '__main__':
-    app.run()
+    app.run(debug =True)
