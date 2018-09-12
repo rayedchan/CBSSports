@@ -11,6 +11,7 @@ from flask_restful import Api, Resource, reqparse
 from bson.json_util import dumps
 import os
 from CommonUtils import getAllSports
+from flask import redirect
 
 # Name of collection to store position age averages
 postAvgAgeCollectionName = 'positionAvgAge'
@@ -18,6 +19,9 @@ databaseName = os.environ.get("MONGODB_DBNAME")
 
 # Name of collection to store all the sports
 sportCollectionName = 'sport'
+
+# Display N players per page
+PER_PAGE = 10
 
 '''
 Get the average age for a specific position from average avg collection
@@ -124,6 +128,32 @@ def getAllPlayers(db, sportName):
         playerList.insert(0, player)
 
     return playerList
+
+'''
+Get all the players in a given sport
+'''
+def getAllPlayersPaged(db, sportName, page):
+    playerList = []
+
+    # Query all documents in a given sport collection
+    # excluding the generated id
+    # added pagination by having startIndex and limiting
+    cursor = db[sportName].find({}, {"_id": 0}).skip((page - 1) * PER_PAGE).limit(PER_PAGE)
+
+    # Add each player with calculated fields to list
+    for player in cursor:
+        # Calculate custom fields
+        player["name_brief"] = deriveNameBrief(player['first_name'], player['last_name'], sportName)
+
+        # Check if player age exists
+        if player['age']:
+            player["average_position_age_diff"] = getAvgPositionAge(db, sportName, player['position']) - player['age']
+
+        # Insert to front of list
+        playerList.insert(0, player)
+
+    return playerList
+
 
 # Current Average = CA
 # Current Total Players = CTP
@@ -430,6 +460,7 @@ class SportPlayer(Resource):
 # Define URI endpoints
 api.add_resource(SportPlayer, "/<string:sportType>/player/<string:playerId>")
 
+# Get all sport players with pagination
 @app.route('/sports/<string:sportName>/players', methods=['GET'])
 def getAllSportPlayers(sportName):
     playerList = getAllPlayers(db, sportName)
@@ -437,6 +468,19 @@ def getAllSportPlayers(sportName):
     # return jsonify({'players': playerList}), 200
     # return compressed json
     return json.dumps(playerList)
+
+# Get all sport players with pagination
+# @app.route('/sports/<string:sportName>/players', methods=['GET'], defaults={'page': 1})
+@app.route('/sports/<string:sportName>/players/page/<int:page>', methods=['GET'])
+def getAllSportPlayersPaged(sportName, page):
+    playerList = getAllPlayersPaged(db, sportName, page)
+    return json.dumps(playerList)
+
+# Get all sport players with pagination
+@app.route('/sports/<string:sportName>/players/count', methods=['GET'])
+def getAllSportPlayersCount(sportName):
+    numDocs = db[sportName].count()
+    return json.dumps(numDocs)
 
 # Get all types of sports
 @app.route('/sports', methods=['GET'])

@@ -6,16 +6,19 @@
     <meta name="author" content="rayedchan">
     <title>Sport Players</title>
     <link rel="stylesheet" href="static/css/bootstrap.min.css">
+    <!--<link rel="stylesheet" href="static/css/bootstrap3.3.1.min.css">--> <!-- legacy contains glyphicons and uib-pagination -->
     <link href="static/css/mycss.css" rel="stylesheet">
     <script src="static/js/angular.min.js"></script>
     <script src="static/js/jquery-3.3.1.min.js"></script>
     <script src="static/js/bootstrap.min.js"></script>
+    <script src="static/js/ui-bootstrap-tpls-2.5.0.min.js"></script> <!-- legacy dependent on old bootstrap -->
 
     <script>
-         angular.module('myApp', []).controller('HomeCtrl', function($scope, $http){
+         angular.module('myApp', ['ui.bootstrap']).controller('HomeCtrl', function($scope, $http){
 
             $scope.input = {}; // for add and update
-            $scope.showAdd = true;
+            $scope.showAdd = true; // flag to show add form
+            $scope.totalItems = 0;
 
             // Make REST call to fetch all the different types of sports
             $scope.showSportList = function() {
@@ -43,6 +46,7 @@
                     url: '/sports/'+ $scope.sport_type +'/players'
                 }).then(function(response) {
                     $scope.players = response.data;
+                    $scope.totalItems = $scope.players.length
                     console.log('players', $scope.players);
                 }, function(error) {
                     console.log(error);
@@ -131,10 +135,20 @@
             //console.log('sport type', $scope.sport_type);
             //$scope.showPlayerList();
 
-         })
+            $scope.currentPage = 1;
+            $scope.maxSize = 5;
+
+            $scope.pageChanged = function()
+            {
+                console.log('Page changed to: ' + $scope.currentPage);
+            };
+
+
+         });
     </script>
 
 </head>
+
 <body ng-controller="HomeCtrl">
     <div class="container">
         <h3 class="text-muted">Sport Players</h3>
@@ -149,7 +163,7 @@
                         <option value="" ng-selected="selected" selected disabled>Please select one</option>
                     </select>
                 </li>
-                 <li>
+                <li>
                      <!-- Add button will be active when a sport type is selected from select options-->
                     <button type="button" class="btn btn-success" data-toggle="modal" ng-click="showAddPopUp()" ng-disabled="!sport_type || sport_type.length == 0">Add</button>
                 </li>
@@ -190,6 +204,14 @@
                     </tr>
                 </tbody>
             </table>
+            <!--<ul uib-pagination class="pagination" template-url="static/templates/pagination.html" total-items="totalItems" max-size="maxSize" ng-model="currentPage" ng-change="pageChanged()"></ul>-->
+            <ul class="pagination">
+                <li class="page-item"><a class="page-link" href="#">Previous</a></li>
+                <li class="page-item"><a class="page-link" href="#">1</a></li>
+                <li class="page-item"><a class="page-link" href="#">2</a></li>
+                <li class="page-item"><a class="page-link" href="#">3</a></li>
+                <li class="page-item"><a class="page-link" href="#">Next</a></li>
+            </ul>
         </div>
 
         <!-- Add/Update Player Popup-->
