@@ -470,7 +470,7 @@ def getAllSportPlayers(sportName):
     return json.dumps(playerList)
 
 # Get all sport players with pagination
-# @app.route('/sports/<string:sportName>/players', methods=['GET'], defaults={'page': 1})
+#@app.route('/sports/<string:sportName>/players', methods=['GET'], defaults={'page': 1})
 @app.route('/sports/<string:sportName>/players/page/<int:page>', methods=['GET'])
 def getAllSportPlayersPaged(sportName, page):
     playerList = getAllPlayersPaged(db, sportName, page)
