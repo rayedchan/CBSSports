@@ -18,7 +18,8 @@
 
             $scope.input = {}; // for add and update
             $scope.showAdd = true; // flag to show add form
-            $scope.totalItems = 0;
+            $scope.totalPlayers = 0; // store total number of players in a sport
+            $scope.perPage = 10; // number of players to show per page; need to change in py file
 
             // Make REST call to fetch all the different types of sports
             $scope.showSportList = function() {
@@ -46,8 +47,8 @@
                     url: '/sports/'+ $scope.sport_type +'/players/page/' + currentPage
                 }).then(function(response) {
                     $scope.players = response.data;
-                    $scope.totalItems = $scope.players.length
                     console.log('players', $scope.players);
+                    $scope.getTotalPlayers(); // get total players in sport
                 }, function(error) {
                     console.log(error);
                 });
@@ -129,13 +130,27 @@
                 });
             }
 
+            // Make REST API call get total players in a sport
+            $scope.getTotalPlayers = function(){
+                $http({
+                    method: 'GET',
+                    url: '/sports/' + $scope.sport_type + '/players/count'
+                }).then(function(response) {
+                    console.log(response.data);
+                    $scope.totalPlayers = response.data;
+                }, function(error) {
+                    console.log(error);
+                });
+            }
+
             // Populate drop down with all the type of sports
             $scope.showSportList();
 
             //console.log('sport type', $scope.sport_type);
             //$scope.showPlayerList();
 
-            $scope.currentPage = 1;
+
+            $scope.currentPage = 1; // page number li element; recalculated when next and prev are clicked; does not change if number li is selected
             $scope.maxSize = 5; // number pages link to display
             $scope.markerPage = 0; // holds current page number when number is clicked
 
@@ -152,6 +167,7 @@
                 console.log('Previous page to: ' + $scope.currentPage);
                 $scope.showPlayerList($scope.currentPage);
                 $scope.markerPage = 0;
+                $scope.selectedIndex = 0; // set active link to first item
             };
 
             $scope.nextPage = function()
@@ -160,6 +176,7 @@
                 console.log('Next Page to:' + $scope.currentPage);
                 $scope.showPlayerList($scope.currentPage);
                 $scope.markerPage = 0;
+                $scope.selectedIndex = 0; // set active link to first item
             };
 
             // For ng-repeat use collection object to iterate as an index and generate the page links
@@ -169,7 +186,7 @@
             };
 
             // Change whenever new sport is selected from drop down
-            $scope.changSport = function()
+            $scope.changeSport = function()
             {
                 // Reset pagination values
                 $scope.currentPage = 1;
@@ -177,7 +194,16 @@
 
                 // Refresh Player list
                 $scope.showPlayerList($scope.currentPage);
+
+                // Reset selected page
+                $scope.selectedIndex = 0;
             };
+
+            $scope.selectedIndex = 0;
+            $scope.selectPage = function(index)
+            {
+               $scope.selectedIndex = index;
+            }
 
 
          });
@@ -194,7 +220,7 @@
             <ul class="navbar">
                 <li>
                     <!-- ng-model has current value of selected option, ng-options generate all option, ng-change when selected option is changed call function  -->
-                    <select ng-model="sport_type" ng-options="sport.id as sport.name for sport in sports" ng-change="changSport()">
+                    <select ng-model="sport_type" ng-options="sport.id as sport.name for sport in sports" ng-change="changeSport()">
                         <!--<option ng-repeat="sport in sports" value="{{ '{{sport}}' }}">{{ '{{sport}}' }}</option>>-->
                         <option value="" ng-selected="selected" selected disabled>Please select one</option>
                     </select>
@@ -227,7 +253,7 @@
                 </thead>
                 <tbody>
                     <tr ng-repeat="player in players track by $index">
-                        <th scope="row">{{'{{(((markerPage != 0 ? markerPage : currentPage) - 1) * 10) + ($index + 1)}}'}}</th>
+                        <th scope="row">{{'{{(((markerPage != 0 ? markerPage : currentPage) - 1) * perPage) + ($index + 1)}}'}}</th>
                         <td>{{ '{{player.id}}' }}</td>
                         <td>{{ '{{player.first_name}}' }}</td>
                         <td>{{ '{{player.last_name}}' }}</td>
@@ -244,9 +270,9 @@
             <!--ul uib-pagination class="pagination" total-items="1000" max-size="maxSize" ng-model="currentPage" ng-change="showPlayerList(currentPage)"></ul>-->
 
             <ul class="pagination">
-                <li class="page-item"><a class="page-link" href="" ng-click="prevPage()" ng-model="currentPage" ng-change="showPlayerList(currentPage)">Previous</a></li>
-                <li ng-repeat="i in getNumber(maxSize) track by $index" class="page-item" ng-click="pageChanged($index + currentPage)"><a class="page-link" href="">{{ '{{$index + currentPage}}' }}</a></li>
-                <li class="page-item"><a class="page-link" href="" ng-click="nextPage()" ng-model="currentPage" ng-change="showPlayerList(currentPage)">Next</a></li>
+                <li class="page-item"><a class="page-link" href="" ng-click="currentPage == 1 || prevPage()" ng-model="currentPage" ng-change="showPlayerList(currentPage)">Previous</a></li>
+                <li ng-repeat="i in getNumber(maxSize) track by $index" class="page-item" ng-model="currentPage" ng-click="pageChanged($index + currentPage);selectPage($index)" ng-class="{'active' : $index==selectedIndex}" ng-hide="($index + currentPage) * perPage > totalPlayers "><a class="page-link" href="">{{ '{{$index + currentPage}}' }}</a></li>
+                <li class="page-item"><a class="page-link" href="" ng-click="totalPlayers == 0 || nextPage()" ng-model="currentPage" ng-change="showPlayerList(currentPage)">Next</a></li>
             </ul>
 
         </div>
