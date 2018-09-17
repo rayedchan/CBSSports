@@ -20,6 +20,7 @@
             $scope.showAdd = true; // flag to show add form
             $scope.totalPlayers = 0; // store total number of players in a sport
             $scope.perPage = 10; // number of players to show per page; need to change in py file
+            $scope.totalPages = 0;
 
             // Make REST call to fetch all the different types of sports
             $scope.showSportList = function() {
@@ -138,6 +139,8 @@
                 }).then(function(response) {
                     console.log(response.data);
                     $scope.totalPlayers = response.data;
+                    $scope.totalPages = Math.ceil($scope.totalPlayers / $scope.perPage); // total pages
+                    console.log('total pages', $scope.totalPages);
                 }, function(error) {
                     console.log(error);
                 });
@@ -146,9 +149,8 @@
             // Populate drop down with all the type of sports
             $scope.showSportList();
 
-            //console.log('sport type', $scope.sport_type);
+            console.log('sport type', $scope.sport_type);
             //$scope.showPlayerList();
-
 
             $scope.currentPage = 1; // page number li element; recalculated when next and prev are clicked; does not change if number li is selected
             $scope.maxSize = 5; // number pages link to display
@@ -271,8 +273,8 @@
 
             <ul class="pagination">
                 <li class="page-item"><a class="page-link" href="" ng-click="currentPage == 1 || prevPage()" ng-model="currentPage" ng-change="showPlayerList(currentPage)">Previous</a></li>
-                <li ng-repeat="i in getNumber(maxSize) track by $index" class="page-item" ng-model="currentPage" ng-click="pageChanged($index + currentPage);selectPage($index)" ng-class="{'active' : $index==selectedIndex}" ng-hide="($index + currentPage) * perPage > totalPlayers "><a class="page-link" href="">{{ '{{$index + currentPage}}' }}</a></li>
-                <li class="page-item"><a class="page-link" href="" ng-click="totalPlayers == 0 || nextPage()" ng-model="currentPage" ng-change="showPlayerList(currentPage)">Next</a></li>
+                <li ng-repeat="i in getNumber(maxSize) track by $index" class="page-item" ng-model="currentPage" ng-click="pageChanged($index + currentPage);selectPage($index)" ng-class="{'active' : $index==selectedIndex}" ng-hide="($index + currentPage) > totalPages"><a class="page-link" href="">{{ '{{$index + currentPage}}' }}</a></li>
+                <li class="page-item"><a class="page-link" href="" ng-click="totalPlayers == 0 || currentPage >= totalPages || nextPage()" ng-model="currentPage" ng-change="showPlayerList(currentPage)">Next</a></li>
             </ul>
 
         </div>
