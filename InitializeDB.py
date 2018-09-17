@@ -160,7 +160,6 @@ def initializeBackend(db):
     # Create the sport collection
     createSportCollection(db, sportsJSON)
 
-    '''
     # Create collections for each type of sport
     createSportTypeCollections(db, sportsJSON)
 
@@ -172,8 +171,6 @@ def initializeBackend(db):
     # Sports JSON data
     sportsJSON = getAllSports()
     setupAvgPositionCollection(db, sportsJSON)
-    '''
-
 
 
 '''

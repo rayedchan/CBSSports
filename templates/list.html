@@ -141,6 +141,15 @@
                     $scope.totalPlayers = response.data;
                     $scope.totalPages = Math.ceil($scope.totalPlayers / $scope.perPage); // total pages
                     console.log('total pages', $scope.totalPages);
+
+                    // No results in page, go back a page
+                    if($scope.currentPage > $scope.totalPages)
+                    {
+                        $scope.currentPage = $scope.currentPage - 1;
+                        $scope.showPlayerList($scope.currentPage);
+                        console.log('Go back previous page: ', $scope.currentPage );
+                     }
+
                 }, function(error) {
                     console.log(error);
                 });
